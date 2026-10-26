@@ -38,6 +38,7 @@ export type IconName =
   | 'download'
   | 'upload'
   | 'sort'
+  | 'link'
   | 'info'
   | 'logo';
 
@@ -86,6 +87,8 @@ const PATHS: Record<IconName, string> = {
   upload:
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/>',
   sort: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
+  link:
+    '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   logo:
     '<ellipse cx="12" cy="5.5" rx="8.5" ry="2.8"/><path d="M3.5 5.5v13c0 1.55 3.8 2.8 8.5 2.8s8.5-1.25 8.5-2.8v-13"/><path d="M10 8.4a3 3 0 1 1 4.2 2.7c-.6.4-1.2.9-1.2 1.8"/><path d="M12 16.4h.01"/>',

@@ -2,6 +2,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain } from 'electron';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
 import {
   analyzeSql,
   ConnectionManager,
@@ -12,6 +13,8 @@ import {
 } from '@kuxi/core';
 import {
   DEFAULT_SETTINGS,
+  DEMO_CONNECTION_NAME,
+  DEMO_SCHEMA_SQL,
   IPC,
   type AiChatOutcome,
   type AiConfigInput,
@@ -451,6 +454,37 @@ function registerIpc(): void {
       return { ok: false, imported: 0, skipped: 0, message: (e as Error).message };
     }
   });
+
+  // ---- 一键体验示例库：在 userData 创建 demo.sqlite 并填充种子，注册连接 ----
+  ipcMain.handle(
+    IPC.CreateDemoConnection,
+    async (): Promise<{ id: string; created: boolean }> => {
+      const demoPath = join(app.getPath('userData'), 'demo.sqlite');
+      // 幂等初始化：建表与种子都带 IF NOT EXISTS / WHERE NOT EXISTS，可重复执行
+      const db = new DatabaseSync(demoPath);
+      try {
+        db.exec(DEMO_SCHEMA_SQL);
+      } finally {
+        db.close();
+      }
+      // 去重：同名示例连接已存在则直接返回其 id，不重复注册
+      const list = readStore();
+      const existing = list.find((s) => s.name === DEMO_CONNECTION_NAME);
+      if (existing) {
+        return { id: existing.id, created: false };
+      }
+      const id = randomUUID();
+      list.push({
+        id,
+        name: DEMO_CONNECTION_NAME,
+        type: 'sqlite',
+        filename: demoPath,
+        hasPassword: false,
+      });
+      writeStore(list);
+      return { id, created: true };
+    },
+  );
 }
 
 app.whenReady().then(() => {

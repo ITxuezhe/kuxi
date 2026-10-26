@@ -208,3 +208,39 @@ export function generateUpdate(
     `${quoteValue(value, dialect)} WHERE ${quoteIdent(dialect, pkCol)} = ${quoteValue(pkValue, dialect)};`
   );
 }
+
+/**
+ * 生成新增行对应的 INSERT 语句。
+ *
+ * 只写入用户真填了的列：留空的列直接从字段列表里去掉，
+ * 这样自增主键、有 DEFAULT 的列、允许 NULL 的列都交给数据库决定，
+ * 不会出现"想用默认值却被写成空串"的坑。
+ *
+ * @param dialect 方言
+ * @param table 表名
+ * @param values 列名 → 用户输入的原始文本（空串视为不写入）
+ * @param numericColumns 数值型列集合（用于把 "123" 还原成数字而不是字符串）
+ */
+export function generateInsert(
+  dialect: DbType,
+  table: string,
+  values: Record<string, string>,
+  numericColumns: ReadonlySet<string> = new Set<string>(),
+): string {
+  const cols = Object.keys(values).filter((col) => values[col].trim() !== '');
+  if (!cols.length) {
+    throw new Error('没有可写入的列');
+  }
+  const columnsSql = cols.map((col) => quoteIdent(dialect, col)).join(', ');
+  const valuesSql = cols
+    .map((col) => {
+      const raw = values[col].trim();
+      // 数值列：纯数字且不是超长整数时按数字写入（避免 SQLite 把 1 存成 "1"）
+      if (numericColumns.has(col) && /^-?\d+(\.\d+)?$/.test(raw)) {
+        return raw;
+      }
+      return quoteValue(raw, dialect);
+    })
+    .join(', ');
+  return `INSERT INTO ${quoteIdent(dialect, table)} (${columnsSql}) VALUES (${valuesSql});`;
+}

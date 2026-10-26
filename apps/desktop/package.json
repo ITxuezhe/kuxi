@@ -11,6 +11,7 @@
   "dependencies": {
     "@kuxi/core": "workspace:*",
     "@kuxi/shared": "workspace:*",
+    "monaco-editor": "^0.57.0",
     "mysql2": "^3.11.3",
     "pg": "^8.13.1",
     "sql-formatter": "^15.4.2",

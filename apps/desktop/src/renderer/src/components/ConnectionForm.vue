@@ -8,7 +8,9 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { DEFAULT_PORTS, type DbType, type IConnectionConfig } from '@kuxi/shared';
 import DbTypePicker from './DbTypePicker.vue';
+import BaseIcon from './BaseIcon.vue';
 import { useToast } from '../composables/useToast';
+import { askAi, useAi } from '../composables/useAi';
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +29,14 @@ const emit = defineEmits<{
 
 const toast = useToast();
 const isEdit = computed<boolean>(() => props.mode === 'edit');
+
+// ---- 自然语言连接向导（AI 填表） ----
+const { config } = useAi();
+const aiReady = computed<boolean>(() => config.value?.ready ?? false);
+const nlInput = ref('');
+const aiBusy = ref(false);
+const nlMsg = ref('');
+const nlMsgKind = ref<'' | 'ok' | 'err'>('');
 
 /** 表单字段（password 只在内存中，主进程负责加密落盘） */
 const form = reactive({
@@ -213,10 +223,117 @@ async function onSave(): Promise<void> {
     saving.value = false;
   }
 }
+
+// ---- 自然语言连接向导：把口语化描述解析为表单字段 ----
+/** 从模型回复里抽取 JSON（兼容 ```json 围栏 / 裸 JSON） */
+function extractJson(content: string): string {
+  const fenced = /```(?:json)?\s*\n?([\s\S]*?)```/i.exec(content);
+  if (fenced?.[1]) return fenced[1].trim();
+  const start = content.indexOf('{');
+  const end = content.lastIndexOf('}');
+  if (start >= 0 && end > start) return content.slice(start, end + 1);
+  return content.trim();
+}
+
+/** 把解析出的结构化字段写回表单（只 touch 已填字段，避免满屏红字） */
+function applyParsed(p: Record<string, unknown>): void {
+  const type = String(p.type ?? '').toLowerCase();
+  if (type === 'sqlite' || type === 'mysql' || type === 'postgres') {
+    form.type = type;
+  }
+  if (typeof p.name === 'string' && p.name.trim()) form.name = p.name.trim();
+  if (type === 'sqlite') {
+    form.filename =
+      typeof p.filename === 'string' && p.filename.trim() ? p.filename.trim() : ':memory:';
+  } else {
+    if (typeof p.host === 'string' && p.host.trim()) form.host = p.host.trim();
+    const port = Number(p.port);
+    if (Number.isFinite(port) && port > 0) {
+      form.port = port;
+      portTouched.value = true;
+    }
+    if (typeof p.user === 'string' && p.user.trim()) form.user = p.user.trim();
+    if (typeof p.password === 'string') form.password = p.password;
+    if (typeof p.database === 'string') form.database = p.database.trim();
+  }
+  // 只标记已填字段，未填字段的校验提示留给用户补全时触发
+  (Object.keys(touched) as Array<keyof typeof touched>).forEach((k) => {
+    const v = form[k];
+    if (typeof v === 'string' && v.trim()) touched[k] = true;
+    else if (typeof v === 'number' && v > 0) touched[k] = true;
+  });
+}
+
+/** 调用 AI 解析自然语言连接描述并回填表单 */
+async function onAiFill(): Promise<void> {
+  if (!aiReady.value || !nlInput.value.trim()) return;
+  aiBusy.value = true;
+  nlMsg.value = '';
+  nlMsgKind.value = '';
+  try {
+    const system = [
+      '你是数据库连接配置解析助手。用户会用口语化、可能不完整的话描述一个数据库连接。',
+      '请从中提取结构化字段，只输出一个 JSON 对象，不要解释或多余文字。',
+      '字段：',
+      '  type: 必为 "sqlite" | "mysql" | "postgres"（无法判断时推测）',
+      '  name: 连接显示名（未提则推断，如"本地 MySQL"）',
+      '  filename: 仅 sqlite 需要；文件路径或 ":memory:"（未提用 ":memory:"）',
+      '  host: mysql/postgres 主机（默认 "127.0.0.1"）',
+      '  port: 端口号数字（缺省用默认：mysql 3306 / postgres 5432）',
+      '  user: 用户名（默认 "root"）',
+      '  password: 密码（未提则空字符串 ""）',
+      '  database: 数据库名（未提则空字符串 ""）',
+      '仅输出 JSON。',
+    ].join('\n');
+    const content = await askAi(system, `请解析这个连接描述：${nlInput.value}`);
+    const parsed = JSON.parse(extractJson(content)) as Record<string, unknown>;
+    applyParsed(parsed);
+    nlMsg.value = '已根据描述填充表单，请核对后保存';
+    nlMsgKind.value = 'ok';
+  } catch (e) {
+    nlMsg.value = `解析失败：${(e as Error).message}（可手动填写或换种说法）`;
+    nlMsgKind.value = 'err';
+  } finally {
+    aiBusy.value = false;
+  }
+}
 </script>
 
 <template>
   <form class="conn-form" novalidate @submit.prevent="onSave">
+    <!-- 自然语言连接向导 -->
+    <div class="ai-fill">
+      <div class="ai-fill-head">
+        <BaseIcon name="sparkles" :size="14" />
+        <span class="ai-fill-title">AI 帮我填</span>
+        <span class="ai-fill-hint">用大白话描述连接，自动识别类型与字段</span>
+      </div>
+      <div class="ai-fill-row">
+        <input
+          v-model="nlInput"
+          type="text"
+          :disabled="aiBusy || !aiReady"
+          placeholder="例如：连本地的 MySQL，库名 app_db，用户 root，密码 123456"
+          aria-label="用自然语言描述连接"
+          @keydown.enter.prevent="onAiFill"
+        />
+        <button
+          type="button"
+          class="primary"
+          :disabled="!aiReady || aiBusy || !nlInput.trim()"
+          :title="aiReady ? '根据描述生成表单' : '请先在顶栏 AI 设置里配置 API Key'"
+          @click="onAiFill"
+        >
+          <span v-if="aiBusy" class="spinner" aria-hidden="true"></span>
+          {{ aiBusy ? '解析中…' : '生成' }}
+        </button>
+      </div>
+      <p v-if="!aiReady" class="ai-fill-tip">
+        未配置 AI：请先在顶栏「AI」→ 设置里填写 API Key
+      </p>
+      <p v-else-if="nlMsg" class="ai-fill-msg" :class="nlMsgKind">{{ nlMsg }}</p>
+    </div>
+
     <DbTypePicker v-model="form.type" />
 
     <div class="field-row">

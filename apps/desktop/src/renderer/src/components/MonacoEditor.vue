@@ -1,0 +1,193 @@
+<script setup lang="ts">
+/**
+ * MonacoEditor — 基于 Monaco 的 SQL 编辑器（替换原 textarea 版 SqlEditor）
+ *
+ * 接口与旧版 SqlEditor 完全一致（v-model / running / aiReady + 五个事件），
+ * 因此 App.vue 只需换引用，无需改动业务逻辑。
+ *
+ * 关键交互：
+ * - ⌘/Ctrl + Enter 执行（Monaco 命令）
+ * - 自定义右键菜单（禁用 Monaco 原生 contextmenu，复用应用统一的 DOM 菜单）
+ * - 选区感知：执行选中 / 格式化 / AI 优化 / AI 解释都按"选区优先，否则全文"
+ * - 主题与字号跟随 useTheme，零硬编码颜色
+ */
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { monaco, applyMonacoTheme } from '../monaco-setup';
+import { openContextMenu } from '../composables/useContextMenu';
+import { useTheme, type FontSizeName } from '../composables/useTheme';
+
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    /** 查询执行中：禁用编辑，防止执行期间内容与结果错位 */
+    running?: boolean;
+    /** AI 相关菜单是否可用（未配置 AI 时置灰） */
+    aiReady?: boolean;
+  }>(),
+  { running: false, aiReady: false },
+);
+
+const emit = defineEmits<{
+  'update:modelValue': [value: string];
+  execute: [];
+  /** 执行选中的 SQL */
+  'execute-selection': [sql: string];
+  /** 请求格式化（App 计算后写回） */
+  format: [payload: { text: string; start: number; end: number }];
+  /** 请求 AI 优化 */
+  optimize: [payload: { text: string; start: number; end: number }];
+  /** 请求 AI 解释 */
+  explain: [text: string];
+}>();
+
+const containerRef = ref<HTMLElement | null>(null);
+let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+/** 防止外部 setValue 触发 onDidChangeModelContent → 回写，造成死循环 */
+let applyingExternal = false;
+
+const { theme, fontSize } = useTheme();
+
+/** 字号档位 → 像素，跟随应用字号设置 */
+const FONT_PX: Record<FontSizeName, number> = { sm: 12, md: 14, lg: 16, xl: 19 };
+
+/** 当前平台的主修饰键文案，避免 Windows 用户看到 ⌘ */
+const modifierKey =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
+
+/** 取"要操作的目标"：有选区用选区，否则用全文；同时返回字符偏移供 App 替换 */
+function getSelectionRange(): { text: string; start: number; end: number } {
+  const ed = editor;
+  if (!ed) return { text: props.modelValue, start: 0, end: props.modelValue.length };
+  const model = ed.getModel();
+  if (!model) return { text: props.modelValue, start: 0, end: props.modelValue.length };
+  const sel = ed.getSelection();
+  if (sel && !sel.isEmpty()) {
+    return {
+      text: model.getValueInRange(sel),
+      start: model.getOffsetAt(sel.getStartPosition()),
+      end: model.getOffsetAt(sel.getEndPosition()),
+    };
+  }
+  const full = ed.getValue();
+  return { text: full, start: 0, end: full.length };
+}
+
+/** 弹自定义右键菜单 */
+function showMenu(event: MouseEvent): void {
+  const { text, start, end } = getSelectionRange();
+  const hasSelection = start !== end;
+  openContextMenu(event, [
+    { label: '执行全部', hint: `${modifierKey}↵`, action: () => emit('execute') },
+    ...(hasSelection
+      ? [{ label: '执行选中', action: () => emit('execute-selection', text) }]
+      : []),
+    { label: '格式化 SQL', separator: true, action: () => emit('format', { text, start, end }) },
+    {
+      label: 'AI 优化',
+      disabled: !props.aiReady,
+      hint: props.aiReady ? undefined : '未配置',
+      action: () => emit('optimize', { text, start, end }),
+    },
+    {
+      label: 'AI 解释',
+      disabled: !props.aiReady,
+      hint: props.aiReady ? undefined : '未配置',
+      action: () => emit('explain', text),
+    },
+  ]);
+}
+
+onMounted(() => {
+  if (!containerRef.value) return;
+  editor = monaco.editor.create(containerRef.value, {
+    value: props.modelValue,
+    language: 'sql',
+    theme: `kuxi-${theme.value}`,
+    automaticLayout: true,
+    minimap: { enabled: false },
+    fontSize: FONT_PX[fontSize.value],
+    lineHeight: 0,
+    scrollBeyondLastLine: false,
+    renderLineHighlight: 'line',
+    contextmenu: false,
+    smoothScrolling: true,
+    tabSize: 2,
+    wordWrap: 'on',
+    padding: { top: 10, bottom: 10 },
+    fontFamily: "'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
+    overviewRulerLanes: 0,
+    fixedOverflowWidgets: true,
+  });
+
+  // 输入 → 向上同步（单向数据流：编辑器是受控根）
+  editor.onDidChangeModelContent(() => {
+    if (applyingExternal) return;
+    emit('update:modelValue', editor!.getValue());
+  });
+
+  // 快捷键：⌘/Ctrl + Enter 执行
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+    if (!props.running) emit('execute');
+  });
+
+  // 自定义右键菜单（覆盖浏览器/Monaco 原生菜单）
+  containerRef.value.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    showMenu(ev);
+  });
+});
+
+// 外部内容变化（格式化/AI 优化/应用 SQL）→ 写回编辑器
+watch(
+  () => props.modelValue,
+  (val) => {
+    if (!editor) return;
+    if (val !== editor.getValue()) {
+      applyingExternal = true;
+      editor.setValue(val);
+      applyingExternal = false;
+    }
+  },
+);
+
+// 执行中锁定编辑
+watch(
+  () => props.running,
+  (running) => {
+    editor?.updateOptions({ readOnly: running });
+  },
+);
+
+// 主题跟随
+watch(theme, (t) => applyMonacoTheme(t));
+
+// 字号跟随
+watch(fontSize, (f) =>
+  editor?.updateOptions({ fontSize: FONT_PX[f] }),
+);
+
+onBeforeUnmount(() => {
+  editor?.dispose();
+  editor = null;
+});
+</script>
+
+<template>
+  <div class="editor">
+    <div ref="containerRef" class="monaco-host"></div>
+    <div v-if="!modelValue" class="editor-ph" aria-hidden="true">SELECT * FROM ...</div>
+    <div class="editor-foot">
+      <span>
+        <span class="kbd">{{ modifierKey }}</span>
+        <span aria-hidden="true"> + </span>
+        <span class="kbd">Enter</span>
+        <span> 执行</span>
+      </span>
+      <span v-if="props.running" style="color: var(--muted)">执行中，编辑已临时锁定…</span>
+      <span class="spacer"></span>
+      <span class="editor-foot-tip">右键：格式化 / AI 优化 / AI 解释</span>
+      <span>{{ modelValue.length }} 字符</span>
+    </div>
+  </div>
+</template>

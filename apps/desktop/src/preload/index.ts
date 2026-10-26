@@ -51,6 +51,10 @@ const api = {
   importConnections: (): Promise<ConnectionImportOutcome> =>
     ipcRenderer.invoke(IPC.ImportConnections),
 
+  /** 一键体验：在 userData 创建 demo.sqlite 并注册「示例库」连接，返回其 id */
+  createDemoConnection: (): Promise<{ id: string; created: boolean }> =>
+    ipcRenderer.invoke(IPC.CreateDemoConnection),
+
   // ---- 设置 ----
   getSettings: (): Promise<AppSettings & { encryptionAvailable: boolean }> =>
     ipcRenderer.invoke(IPC.GetSettings),

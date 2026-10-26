@@ -10,8 +10,7 @@
  */
 import { computed, onMounted, reactive, ref } from 'vue';
 import ConnectionForm from './components/ConnectionForm.vue';
-import SqlEditor from './components/SqlEditor.vue';
-import ResultTable from './components/ResultTable.vue';
+import Workbench from './components/Workbench.vue';
 import ThemeSwitcher from './components/ThemeSwitcher.vue';
 import ToastHost from './components/ToastHost.vue';
 import ConfirmDialog from './components/ConfirmDialog.vue';
@@ -19,36 +18,31 @@ import ConfirmModal from './components/ConfirmModal.vue';
 import AiPanel from './components/AiPanel.vue';
 import AiSettings from './components/AiSettings.vue';
 import SchemaTree from './components/SchemaTree.vue';
-import TableDesigner from './components/TableDesigner.vue';
 import InfoDialog from './components/InfoDialog.vue';
 import ContextMenu from './components/ContextMenu.vue';
 import Modal from './components/Modal.vue';
 import BaseIcon from './components/BaseIcon.vue';
 import { useToast } from './composables/useToast';
 import { openContextMenu } from './composables/useContextMenu';
-import {
-  buildSchemaText,
-  dialectOf,
-  explainSql,
-  optimizeSql,
-  refreshAiConfig,
-  useAi,
-} from './composables/useAi';
-import { formatSql, generateUpdate } from './utils/sql';
-import type { QueryResult, SqlAnalysis } from '@kuxi/shared';
+import { refreshAiConfig } from './composables/useAi';
+import { parseConnectionUrl } from './utils/connectionUrl';
+import { useWorkbench, type WorkbenchTab } from './composables/useWorkbench';
+import type { SqlAnalysis } from '@kuxi/shared';
 
 const toast = useToast();
-const { ready: aiReady } = useAi();
+
+// 主区标签工作台（单例 store）
+const wb = useWorkbench();
 
 // ConnectionItem 由 env.d.ts 全局声明（与 preload 返回结构一致），这里直接复用避免重复定义
 const connections = ref<ConnectionItem[]>([]);
 const activeId = ref('');
-const sql = ref('SELECT 1 AS ok, sqlite_version() AS version;');
-const result = ref<QueryResult | null>(null);
-const error = ref('');
-const running = ref(false);
 /** 正在断开的连接 id，用于按钮 loading 态 */
 const disconnectingId = ref('');
+/** 正在创建示例库时的加载态 */
+const demoBusy = ref(false);
+/** 连接配置导入/导出进行中（守卫按钮，避免重复弹系统框） */
+const fileBusy = ref(false);
 
 /** 只读模式（策略在主进程，这里只是镜像，供 UI 展示） */
 const readOnly = ref(false);
@@ -59,14 +53,14 @@ const encryptionAvailable = ref(true);
 const confirmOpen = ref(false);
 const pendingAnalysis = ref<SqlAnalysis | null>(null);
 const pendingSql = ref('');
+/** 触发确认时所在的标签（确认后回到该标签执行） */
+const pendingTab = ref<WorkbenchTab | null>(null);
 
 /** AI 抽屉与配置 */
 const aiOpen = ref(false);
 const aiSettingsOpen = ref(false);
 
-/** 可视化建表 */
-const tableDesignerOpen = ref(false);
-const schemaRefreshToken = ref(0);
+/** 可视化建表（已迁至主区「设计表」标签页；保留旧 Modal 入口，未使用） */
 
 /** AI 解释弹窗 */
 const infoOpen = ref(false);
@@ -79,6 +73,14 @@ const connModal = reactive<{
   mode: 'create' | 'edit';
   initial: ConnectionItem | null;
 }>({ open: false, mode: 'create', initial: null });
+
+/** 从链接（连接 URI）导入连接 */
+const urlImport = reactive<{ open: boolean; text: string; error: string; busy: boolean }>({
+  open: false,
+  text: '',
+  error: '',
+  busy: false,
+});
 
 /** 连接搜索关键字 */
 const searchKeyword = ref('');
@@ -128,6 +130,23 @@ const currentLabel = computed<string>(() => {
 /** 当前连接的数据库类型（用于方言） */
 const dbType = computed(() => (currentConnection.value?.type as 'sqlite' | 'mysql' | 'postgres') ?? 'sqlite');
 
+/** 当前连接是否已建立（供工作台判断建表/写入是否可写） */
+const connected = computed(() => Boolean(currentConnection.value?.active));
+
+// 把连接上下文绑定给工作台状态机；危险确认与解释弹窗上抛到 App 的对话框
+wb.bindConnection(activeId, dbType, connected);
+wb.onNeedConfirm((tab, sqlText, analysis) => {
+  pendingTab.value = tab;
+  pendingSql.value = sqlText;
+  pendingAnalysis.value = analysis;
+  confirmOpen.value = true;
+});
+wb.onInfo((title, content) => {
+  infoTitle.value = title;
+  infoContent.value = content;
+  infoOpen.value = true;
+});
+
 /** 按关键字过滤后的连接列表（名称 / 类型 / 主机 / 文件路径），并按 sortMode 排序 */
 const filteredConnections = computed<ConnectionItem[]>(() => {
   const kw = searchKeyword.value.trim().toLowerCase();
@@ -173,9 +192,6 @@ async function refresh(): Promise<void> {
 function selectConnection(id: string): void {
   if (activeId.value === id) return;
   activeId.value = id;
-  result.value = null;
-  error.value = '';
-  clearActiveTable();
 }
 
 /**
@@ -190,17 +206,22 @@ function onConnClick(item: ConnectionItem): void {
   selectConnection(item.id);
 }
 
+/** 正在连接的连接 id（连点同一张卡不会重复发起连接；不需要触发重渲染，故用普通 Set） */
+const connectingIds = new Set<string>();
+
 /** 用已保存配置重连（复用原 id） */
 async function connectExisting(id: string): Promise<void> {
+  if (connectingIds.has(id)) return;
+  connectingIds.add(id);
   try {
     await window.kuxi.connectExisting(id);
     activeId.value = id;
-    result.value = null;
-    error.value = '';
-    clearActiveTable();
+    wb.ensureQueryTab();
     await refresh();
   } catch (e) {
     toast.error(`连接失败：${(e as Error).message}`);
+  } finally {
+    connectingIds.delete(id);
   }
 }
 
@@ -216,6 +237,37 @@ function openEdit(item: ConnectionItem): void {
   connModal.mode = 'edit';
   connModal.initial = item;
   connModal.open = true;
+}
+
+/** 打开「从链接导入」弹窗 */
+function openUrlImport(): void {
+  urlImport.text = '';
+  urlImport.error = '';
+  urlImport.busy = false;
+  urlImport.open = true;
+}
+
+/** 解析连接链接并导入（保存 + 连接），成功后自动选中 */
+async function doUrlImport(): Promise<void> {
+  if (urlImport.busy) return;
+  const parsed = parseConnectionUrl(urlImport.text);
+  if (!parsed.config) {
+    urlImport.error = parsed.error ?? '链接解析失败';
+    return;
+  }
+  urlImport.busy = true;
+  urlImport.error = '';
+  try {
+    const { id } = await window.kuxi.connect(parsed.config);
+    urlImport.open = false;
+    activeId.value = id;
+    await refresh();
+    toast.success(`已从链接导入连接「${parsed.config.name}」`);
+  } catch (e) {
+    urlImport.error = `导入失败：${(e as Error).message}`;
+  } finally {
+    urlImport.busy = false;
+  }
 }
 
 /** 新建连接保存成功 */
@@ -326,379 +378,60 @@ function cycleSort(): void {
 
 /** 导出全部连接配置到 JSON 文件（不含密码密文） */
 async function onExport(): Promise<void> {
-  const res = await window.kuxi.exportConnections();
-  if (res.ok && res.path) {
-    toast.success(`已导出连接到 ${res.path}`);
-  } else if (res.canceled) {
-    return;
-  } else {
-    toast.error(`导出失败：${res.message ?? '未知错误'}`);
+  if (fileBusy.value) return;
+  fileBusy.value = true;
+  try {
+    const res = await window.kuxi.exportConnections();
+    if (res.ok && res.path) {
+      toast.success(`已导出连接到 ${res.path}`);
+    } else if (res.canceled) {
+      return;
+    } else {
+      toast.error(`导出失败：${res.message ?? '未知错误'}`);
+    }
+  } finally {
+    fileBusy.value = false;
   }
 }
 
 /** 从 JSON 文件导入连接配置（去重后合并，密码需用户稍后补填） */
 async function onImport(): Promise<void> {
-  const res = await window.kuxi.importConnections();
-  if (res.ok) {
-    toast.success(res.message ?? `已导入 ${res.imported} 个连接`);
-    await refresh();
-  } else if (res.message && res.message !== '已取消导入') {
-    toast.error(`导入失败：${res.message}`);
-  }
-}
-
-/**
- * 执行 SQL（统一入口，处理 ok/confirm/error 三种信封）。
- * @param text 要执行的 SQL
- * @param confirmed 用户是否已确认高危语句
- * @param syncEditor 是否把 text 同步回编辑器（AI「执行」/点表名用 true）
- */
-async function doExecute(text: string, confirmed: boolean, syncEditor: boolean): Promise<void> {
-  if (running.value) {
-    return;
-  }
-  if (!activeId.value) {
-    error.value = '请先选择或新建一个连接';
-    toast.error('请先选择或新建一个连接');
-    return;
-  }
-  if (syncEditor) {
-    sql.value = text;
-  }
-
-  running.value = true;
-  error.value = '';
-  result.value = null;
+  if (fileBusy.value) return;
+  fileBusy.value = true;
   try {
-    const outcome = await window.kuxi.execute(activeId.value, text, confirmed);
-    if (outcome.status === 'ok') {
-      const r = outcome.result;
-      result.value = r;
-      if (typeof r.affectedRows === 'number' && r.affectedRows >= 0 && r.kind !== 'read') {
-        toast.success(`执行成功：影响 ${r.affectedRows} 行，耗时 ${r.tookMs}ms`);
-      } else {
-        toast.success(`查询完成：${r.rowCount} 行，耗时 ${r.tookMs}ms`);
-      }
-    } else if (outcome.status === 'confirm') {
-      // 高危语句：先挂起，等用户在弹窗里确认
-      pendingSql.value = outcome.sql;
-      pendingAnalysis.value = outcome.analysis;
-      confirmOpen.value = true;
-    } else {
-      error.value = outcome.message;
-      toast.error(outcome.message);
+    const res = await window.kuxi.importConnections();
+    if (res.ok) {
+      toast.success(res.message ?? `已导入 ${res.imported} 个连接`);
+      await refresh();
+    } else if (res.message && res.message !== '已取消导入') {
+      toast.error(`导入失败：${res.message}`);
     }
-  } catch (e) {
-    const message = (e as Error).message;
-    error.value = message;
-    toast.error(`执行失败：${message}`);
   } finally {
-    running.value = false;
+    fileBusy.value = false;
   }
 }
 
-/** 执行编辑器当前内容（手动执行 → 关闭可编辑网格，因为结果不再是简单数据表） */
-function run(): void {
-  clearActiveTable();
-  void doExecute(sql.value, false, false);
-}
-
-/** 执行指定 SQL（不改编辑器内容），用于"执行选中" */
-function runText(text: string): void {
-  clearActiveTable();
-  void doExecute(text, false, false);
-}
-
-/** 清空"可编辑数据网格"上下文 */
-function clearActiveTable(): void {
-  activeTable.value = null;
-  activeTableSql.value = '';
-}
-
-/**
- * 双击表 → 打开数据网格（Navicat 核心交互）。
- * 执行 SELECT * LIMIT 100，并记录表名 + 主键列，供单元格编辑生成 UPDATE。
- * @param table 表名
- * @param pkColumns 主键列
- */
-function openTableData(table: string, pkColumns: string[]): void {
-  if (!activeId.value) {
-    toast.error('请先选择连接');
-    return;
-  }
-  const ident = dbType.value === 'mysql' ? `\`${table}\`` : `"${table}"`;
-  const selectSql = `SELECT * FROM ${ident} LIMIT 100;`;
-  activeTable.value = { name: table, pkColumns };
-  activeTableSql.value = selectSql;
-  void doExecute(selectSql, false, true);
-}
-
-/**
- * 单元格编辑提交：生成 UPDATE（带主键 WHERE，不触发危险确认），执行后重跑数据网格。
- * @param payload 编辑信息
- */
-async function onUpdateCell(payload: {
-  column: string;
-  newValue: string;
-  oldValue: unknown;
-  pkValue: unknown;
-}): Promise<void> {
-  const table = activeTable.value;
-  if (!table || !table.pkColumns.length) return;
-  const pkCol = table.pkColumns[0];
-  const updateSql = generateUpdate(
-    dbType.value,
-    table.name,
-    pkCol,
-    payload.pkValue,
-    payload.column,
-    payload.newValue,
-    payload.oldValue,
-  );
-
+/** 一键体验：创建并注册「示例库」连接，自动选中并连接 */
+async function createDemo(): Promise<void> {
+  if (demoBusy.value) return;
+  demoBusy.value = true;
   try {
-    const outcome = await window.kuxi.execute(activeId.value, updateSql, false);
-    if (outcome.status === 'ok') {
-      toast.success('已更新 1 行');
-      if (activeTableSql.value) void doExecute(activeTableSql.value, false, false);
-    } else if (outcome.status === 'confirm') {
-      // 兜底：理论上带 WHERE 不会走到这，若走到则让用户确认
-      pendingSql.value = outcome.sql;
-      pendingAnalysis.value = outcome.analysis;
-      confirmOpen.value = true;
-    } else {
-      toast.error(outcome.message);
-    }
+    const { id } = await window.kuxi.createDemoConnection();
+    activeId.value = id;
+    await connectExisting(id);
+    toast.success('已就绪：示例库已创建并连接，可直接体验');
   } catch (e) {
-    toast.error(`更新失败：${(e as Error).message}`);
-  }
-}
-
-/** 确认弹窗：用户点了确认 */
-function onConfirmExecute(): void {
-  confirmOpen.value = false;
-  void doExecute(pendingSql.value, true, false);
-}
-
-/** 确认弹窗：取消执行 */
-function onCancelExecute(): void {
-  confirmOpen.value = false;
-  pendingAnalysis.value = null;
-  toast.info('已取消执行');
-}
-
-/** 把 text 替换回编辑器，并保留原选区范围 */
-function replaceRange(start: number, end: number, text: string): void {
-  sql.value = sql.value.slice(0, start) + text + sql.value.slice(end);
-}
-
-/**
- * 编辑器右键「格式化」。
- */
-function onFormat(payload: { text: string; start: number; end: number }): void {
-  const formatted = formatSql(payload.text, dbType.value);
-  replaceRange(payload.start, payload.end, formatted);
-  toast.success('已格式化 SQL');
-}
-
-/**
- * 编辑器右键「AI 优化」。
- */
-async function onOptimize(payload: { text: string; start: number; end: number }): Promise<void> {
-  try {
-    toast.info('AI 正在优化…');
-    const schemaText = await safeSchemaText();
-    const optimized = await optimizeSql(payload.text, dialectOf(dbType.value), schemaText);
-    replaceRange(payload.start, payload.end, optimized);
-    toast.success('已替换为优化后的 SQL');
-  } catch (e) {
-    toast.error(`优化失败：${(e as Error).message}`);
-  }
-}
-
-/**
- * 编辑器右键「AI 解释」。
- */
-async function onExplain(text: string): Promise<void> {
-  try {
-    toast.info('AI 正在解释…');
-    const explanation = await explainSql(text, dialectOf(dbType.value));
-    infoTitle.value = 'SQL 解释';
-    infoContent.value = explanation;
-    infoOpen.value = true;
-  } catch (e) {
-    toast.error(`解释失败：${(e as Error).message}`);
-  }
-}
-
-/** 尽力取当前连接的结构文本；失败返回 undefined（不阻塞 AI 调用） */
-async function safeSchemaText(): Promise<string | undefined> {
-  if (!activeId.value || !currentConnection.value?.active) return undefined;
-  try {
-    const schema = await window.kuxi.getSchema(activeId.value);
-    return buildSchemaText(schema).text;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * 切换只读模式（写策略在主进程，这里只发指令并同步 UI）。
- */
-async function toggleReadOnly(): Promise<void> {
-  const next = !readOnly.value;
-  try {
-    const settings = await window.kuxi.setSettings({ readOnly: next });
-    readOnly.value = settings.readOnly;
-    toast.info(next ? '已开启只读模式：所有写操作会被拒绝' : '已关闭只读模式：可以执行增删改');
-  } catch (e) {
-    toast.error(`切换失败：${(e as Error).message}`);
-  }
-}
-
-/**
- * 断开指定连接。
- * @param id 连接 id
- */
-async function disconnect(id: string): Promise<void> {
-  if (disconnectingId.value) {
-    return;
-  }
-  const target = connections.value.find((item) => item.id === id);
-  disconnectingId.value = id;
-  try {
-    await window.kuxi.disconnect(id);
-    toast.info(`已断开${target ? `「${target.name}」` : '连接'}`);
-    await refresh();
-  } catch (e) {
-    toast.error(`断开失败：${(e as Error).message}`);
+    toast.error(`创建示例库失败：${(e as Error).message}`);
   } finally {
-    disconnectingId.value = '';
+    demoBusy.value = false;
   }
 }
 
-/**
- * 让连接卡片支持键盘操作（Enter / Space 选中/连接）。
- * @param event 键盘事件
- * @param item 连接项
- */
-function onCardKeydown(event: KeyboardEvent, item: ConnectionItem): void {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault();
-    onConnClick(item);
-  }
-}
-
-/** 把外部生成的 SQL（AI 结果 / 点表名）填入编辑器，不自动执行 */
-function applySql(text: string): void {
-  sql.value = text;
-  toast.success('已填入编辑器，确认后再执行');
-}
-
-/** AI 面板「执行」：填入编辑器并立即执行 */
-function runAi(text: string): void {
-  clearActiveTable();
-  void doExecute(text, false, true);
-}
-
-/** 表结构右键「删除表」：生成 DROP 并走执行（会触发危险确认） */
-function onDropTable(table: string): void {
-  clearActiveTable();
-  const ident = dbType.value === 'mysql' ? `\`${table}\`` : `"${table}"`;
-  void doExecute(`DROP TABLE ${ident};`, false, true);
-}
-
-onMounted(async () => {
-  void refresh();
-  try {
-    const settings = await window.kuxi.getSettings();
-    readOnly.value = settings.readOnly;
-    encryptionAvailable.value = settings.encryptionAvailable;
-    sortMode.value = settings.connectionSort ?? 'default';
-  } catch {
-    /* 设置读取失败不阻塞使用，保持默认 */
-  }
-  // 预取 AI 配置，让 AI 面板一打开就知道是否需要引导配置
-  await refreshAiConfig();
-});
-</script>
-
-<template>
-  <div class="app">
-    <!-- 顶部工具栏：品牌 / 当前连接 / 只读开关 / AI / 外观设置 / 执行 -->
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true"><BaseIcon name="logo" :size="18" /></span>
-        <span>库犀</span>
-        <span class="brand-sub">用大白话问数据库</span>
-      </div>
-
-      <span class="conn-chip" :title="currentLabel">
-        <span class="conn-dot" :class="{ on: currentConnection?.active }" aria-hidden="true"></span>
-        <span>当前连接：</span>
-        <strong>{{ currentLabel }}</strong>
-      </span>
-
-      <div class="topbar-actions">
-        <button
-          class="ghost icon-lead"
-          :class="{ 'is-on': readOnly }"
-          type="button"
-          :aria-pressed="readOnly"
-          :title="readOnly ? '只读模式：写操作会被拒绝（点击关闭）' : '可写模式：允许增删改（点击开启只读）'"
-          @click="toggleReadOnly"
-        >
-          <BaseIcon :name="readOnly ? 'lock' : 'unlock'" :size="15" />
-          <span>{{ readOnly ? '只读' : '可写' }}</span>
-        </button>
-        <button
-          class="ghost icon-lead"
-          :class="{ 'is-on': aiOpen }"
-          type="button"
-          :aria-pressed="aiOpen"
-          title="AI 助手：用中文生成 SQL"
-          @click="aiOpen = !aiOpen"
-        >
-          <BaseIcon name="sparkles" :size="15" />
-          <span>AI</span>
-        </button>
-        <ThemeSwitcher />
-        <button
-          class="primary"
-          type="button"
-          :disabled="running"
-          :title="activeId ? '执行当前 SQL' : '请先选择连接'"
-          @click="run()"
-        >
-          <span v-if="running" class="spinner" aria-hidden="true"></span>
-          <BaseIcon v-else name="play" :size="13" />
-          <span>{{ running ? '执行中…' : '执行' }}</span>
-        </button>
-      </div>
-    </header>
-
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="sidebar-head">
-          <h2>
-            <span>连接</span>
-            <span class="count">{{ connections.length }}</span>
-          </h2>
-          <div class="sidebar-head-actions">
-            <button
-              class="icon-btn"
-              type="button"
-              :title="`排序：${sortMode === 'default' ? '默认' : sortMode === 'name' ? '按名称' : '按类型'}`"
-              :aria-label="`排序：${sortMode === 'default' ? '默认' : sortMode === 'name' ? '按名称' : '按类型'}`"
-              @click="cycleSort"
-            >
-              <BaseIcon name="sort" :size="15" />
-            </button>
-            <button
               class="icon-btn"
               type="button"
               title="导入连接"
               aria-label="导入连接"
+              :disabled="fileBusy"
               @click="onImport"
             >
               <BaseIcon name="upload" :size="15" />
@@ -708,56 +441,15 @@ onMounted(async () => {
               type="button"
               title="导出连接"
               aria-label="导出连接"
-              @click="onExport"
+              type="button"
+              :disabled="demoBusy"
+              @click="createDemo"
             >
-              <BaseIcon name="download" :size="15" />
+              <span v-if="demoBusy" class="spinner" aria-hidden="true"></span>
+              <BaseIcon v-else name="sparkles" :size="14" />
+              <span>{{ demoBusy ? '正在创建…' : '一键体验示例库' }}</span>
             </button>
-            <button class="add-conn" type="button" title="新建连接" @click="openCreate">
-              <BaseIcon name="plus" :size="14" />
-              <span>新建连接</span>
-            </button>
-          </div>
-        </div>
-
-        <input
-          v-model="searchKeyword"
-          class="conn-search"
-          type="search"
-          placeholder="搜索连接…"
-          aria-label="搜索连接"
-        />
-
-        <div class="conn-list">
-          <div
-            v-for="item in filteredConnections"
-            :key="item.id"
-            class="conn-item"
-            :class="{ active: item.id === activeId }"
-            role="button"
-            tabindex="0"
-            :aria-pressed="item.id === activeId"
-            :aria-label="`${item.active ? '选择' : '连接'} ${item.name}`"
-            @click="onConnClick(item)"
-            @keydown="onCardKeydown($event, item)"
-            @contextmenu="onConnContextMenu($event, item)"
-          >
-            <span class="type-badge" :style="{ background: typeBadge(item.type).color }" aria-hidden="true">
-              <BaseIcon name="database" :size="14" />
-            </span>
-            <div class="conn-body">
-              <div class="conn-name">{{ item.name }}</div>
-              <div class="conn-sub">
-                {{ item.type }}
-                <template v-if="item.type === 'sqlite'"> · {{ item.filename || ':memory:' }}</template>
-                <template v-else> · {{ item.host }}:{{ item.port }}</template>
-              </div>
-            </div>
-            <span class="conn-dot" :class="{ on: item.active }" :title="item.active ? '已连接' : '未连接'" aria-hidden="true"></span>
-          </div>
-
-          <div v-if="!connections.length" class="empty-card">
-            <strong>还没有任何连接</strong>
-            点右上角「＋ 新建连接」添加第一个，<br />保存后即可开始查询。
+            <p class="empty-sub">无需配置，自动建一个带示例数据的 SQLite 库，立刻上手。</p>
           </div>
           <div v-else-if="!filteredConnections.length" class="empty-card">
             没有匹配「{{ searchKeyword }}」的连接
@@ -777,7 +469,7 @@ onMounted(async () => {
       </aside>
 
       <main class="main">
-        <SqlEditor
+        <MonacoEditor
           v-model="sql"
           :running="running"
           :ai-ready="aiReady"
@@ -794,7 +486,9 @@ onMounted(async () => {
           :editable="Boolean(activeTable)"
           :table-name="activeTable?.name || ''"
           :pk-columns="activeTable?.pkColumns || []"
+          :inserting="insertBusy"
           @update-cell="onUpdateCell"
+          @insert-row="onInsertRow"
         />
       </main>
 
@@ -851,6 +545,45 @@ onMounted(async () => {
         @updated="onConnUpdated"
         @close="connModal.open = false"
       />
+    </Modal>
+
+    <!-- 从链接导入连接 -->
+    <Modal
+      :open="urlImport.open"
+      title="从链接导入连接"
+      body-class="conn-modal"
+      @close="urlImport.open = false"
+    >
+      <div class="url-import">
+        <label class="url-import-label" for="url-import-input">粘贴连接链接</label>
+        <textarea
+          id="url-import-input"
+          v-model="urlImport.text"
+          class="url-import-input"
+          rows="3"
+          placeholder="mysql://user:password@host:3306/db&#10;postgres://user:pass@host:5432/db&#10;sqlite:///Users/me/demo.db"
+          spellcheck="false"
+          @keydown.ctrl.enter.prevent="doUrlImport"
+          @keydown.meta.enter.prevent="doUrlImport"
+        ></textarea>
+        <p v-if="urlImport.error" class="url-import-err">{{ urlImport.error }}</p>
+        <p class="url-import-hint">
+          支持 mysql / postgres / sqlite（postgresql、sqlite3 亦可）。密码可省略，导入后可在「编辑连接」补齐。
+        </p>
+        <div class="url-import-actions">
+          <button class="ghost" type="button" @click="urlImport.open = false">取消</button>
+          <button
+            class="primary"
+            type="button"
+            :disabled="urlImport.busy || !urlImport.text.trim()"
+            @click="doUrlImport"
+          >
+            <span v-if="urlImport.busy" class="spinner" aria-hidden="true"></span>
+            <BaseIcon v-else name="link" :size="14" />
+            <span>{{ urlImport.busy ? '导入中…' : '导入' }}</span>
+          </button>
+        </div>
+      </div>
     </Modal>
 
     <!-- 删除连接确认 -->

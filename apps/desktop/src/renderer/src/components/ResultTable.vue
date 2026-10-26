@@ -2,15 +2,19 @@
 /**
  * ResultTable — 查询结果展示
  *
- * 四种状态严格区分（此前仅区分「有/无 result」）：
+ * 五种状态严格区分（此前仅区分「有/无 result」）：
  * 1. loading  — 执行中，展示骨架屏
  * 2. error    — 执行失败，展示错误信息
  * 3. idle     — 尚未执行过查询（result 为 null）
  * 4. empty    — 执行成功但返回 0 行
+ * 5. write    — 写语句执行成功（影响 N 行）
  *
- * 其他增强：行号列、NULL 值弱化、单元格点击复制并 toast 提示。
+ * Navicat 式交互：
+ * - 单击任意一行 → 选中高亮 + 底部「行详情」面板（列名/值可点复制）
+ * - 可编辑网格（双击表打开）底部常驻一条空白「新增行」，填写后 Enter/按钮写入
+ * - 双击单元格改单格，右键复制/导出
  */
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { ExporterInfo, QueryResult } from '@kuxi/shared';
 import { useClipboard } from '../composables/useClipboard';
 import { useToast } from '../composables/useToast';
@@ -27,18 +31,29 @@ const props = withDefaults(
     error?: string;
     /** 是否可编辑（打开数据网格时为 true，需配套 tableName + pkColumns） */
     editable?: boolean;
-    /** 当前数据网格对应的表名（生成 UPDATE 用） */
+    /** 当前数据网格对应的表名（生成 UPDATE/INSERT 用） */
     tableName?: string;
     /** 主键列（定位行的 WHERE 条件） */
     pkColumns?: string[];
+    /** 正在写入新增行（按钮 loading 态） */
+    inserting?: boolean;
   }>(),
-  { loading: false, error: '', editable: false, tableName: '', pkColumns: () => [] },
+  {
+    loading: false,
+    error: '',
+    editable: false,
+    tableName: '',
+    pkColumns: () => [],
+    inserting: false,
+  },
 );
 
 const emit = defineEmits<{
   'update-cell': [
     payload: { column: string; newValue: string; oldValue: unknown; pkValue: unknown },
   ];
+  /** 提交新增行：只带用户真填了的列 */
+  'insert-row': [payload: { values: Record<string, string>; numericColumns: string[] }];
 }>();
 
 const { copy } = useClipboard();
@@ -51,6 +66,12 @@ const exporters = ref<ExporterInfo[]>([]);
 const editing = ref<{ rowIndex: number; col: string } | null>(null);
 const editValue = ref('');
 const editInputRef = ref<HTMLInputElement | null>(null);
+
+/** 当前选中的行下标（行详情面板的数据源） */
+const selectedIndex = ref<number | null>(null);
+
+/** 新增行的草稿：列名 → 用户输入的文本 */
+const draft = ref<Record<string, string>>({});
 
 /** 骨架屏行数，模拟真实表格观感 */
 const SKELETON_ROWS = 6;
@@ -80,6 +101,41 @@ const isEmpty = computed<boolean>(
     props.result.rows.length === 0 &&
     !isWriteResult.value,
 );
+
+/** 列名列表（空态保护，模板里反复用） */
+const columns = computed<string[]>(() => props.result?.columns ?? []);
+
+/** 当前选中的行数据 */
+const selectedRow = computed<Record<string, unknown> | null>(() => {
+  if (selectedIndex.value === null || !props.result) return null;
+  return props.result.rows[selectedIndex.value] ?? null;
+});
+
+/** 新增行是否填了内容（决定保存按钮是否可点） */
+const draftFilled = computed<boolean>(() =>
+  Object.values(draft.value).some((value) => value.trim() !== ''),
+);
+
+/**
+ * 从现有数据推断数值列：该列至少有一行是 number，且没有一行是字符串。
+ * 用于 INSERT 时把 "1399" 写成数字而不是字符串（SQLite 弱类型会悄悄把数字存成文本）。
+ */
+const numericColumns = computed<Set<string>>(() => {
+  const result = props.result;
+  const set = new Set<string>();
+  if (!result) return set;
+  for (const col of result.columns) {
+    let sawNumber = false;
+    let sawText = false;
+    for (const row of result.rows) {
+      const value = row[col];
+      if (typeof value === 'number' || typeof value === 'bigint') sawNumber = true;
+      else if (typeof value === 'string') sawText = true;
+    }
+    if (sawNumber && !sawText) set.add(col);
+  }
+  return set;
+});
 
 /**
  * 取单元格展示文本。
@@ -142,9 +198,24 @@ async function copyRow(row: Record<string, unknown>): Promise<void> {
   else toast.error('复制失败');
 }
 
+/**
+ * 单击行：选中并展示行详情（再点同一行不取消，避免手滑丢详情）。
+ * @param index 行下标
+ */
+function selectRow(index: number): void {
+  selectedIndex.value = index;
+}
+
+/** 关闭行详情 */
+function clearSelection(): void {
+  selectedIndex.value = null;
+}
+
 /** 该列是否允许编辑（有主键、且该列不是主键） */
 function canEdit(col: string): boolean {
-  return props.editable && Boolean(props.tableName) && props.pkColumns.length > 0 && !props.pkColumns.includes(col);
+  return (
+    props.editable && Boolean(props.tableName) && props.pkColumns.length > 0 && !props.pkColumns.includes(col)
+  );
 }
 
 /** 把原始值转成输入框里的字符串（NULL 显示为空串） */
@@ -202,6 +273,42 @@ function onEditKeydown(event: KeyboardEvent, row: Record<string, unknown>): void
   }
 }
 
+/** 清空新增行草稿 */
+function clearDraft(): void {
+  const next: Record<string, string> = {};
+  for (const col of columns.value) next[col] = '';
+  draft.value = next;
+}
+
+/** 提交新增行：只把非空列交给 App 生成 INSERT */
+function saveDraft(): void {
+  if (!props.editable || props.inserting) return;
+  const values: Record<string, string> = {};
+  for (const col of columns.value) {
+    const raw = draft.value[col] ?? '';
+    if (raw.trim() !== '') values[col] = raw.trim();
+  }
+  if (!Object.keys(values).length) {
+    toast.info('请先填写至少一个字段');
+    return;
+  }
+  emit('insert-row', { values, numericColumns: [...numericColumns.value] });
+}
+
+/**
+ * 新增行输入框按键：Enter 保存、Esc 清空。
+ * @param event 键盘事件
+ */
+function onDraftKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    saveDraft();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    clearDraft();
+  }
+}
+
 /**
  * 单元格右键：复制单元格 / 复制整行 / 导出（按可用导出插件动态列出）。
  * @param event 鼠标事件
@@ -254,6 +361,20 @@ function defaultBaseName(): string {
   const pad = (n: number): string => String(n).padStart(2, '0');
   return `query_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
+
+/**
+ * 每次拿到新结果就重置选中与草稿：避免"上一次查询选中的第 5 行"
+ * 在今天这次结果里继续高亮，也避免草稿里残留旧列。
+ */
+watch(
+  () => props.result,
+  () => {
+    selectedIndex.value = null;
+    editing.value = null;
+    clearDraft();
+  },
+  { immediate: true },
+);
 
 onMounted(async () => {
   try {
@@ -331,21 +452,29 @@ onMounted(async () => {
       <div class="meta">
         返回 {{ props.result.rowCount }} 行 · {{ props.result.tookMs }}ms
         <span v-if="props.result.truncated" class="warn">（结果已按上限截断）</span>
-        <span class="tip">{{ props.editable ? '双击编辑 · 右键复制/导出' : '右键复制/导出' }}</span>
+        <span class="tip">
+          {{ props.editable ? '单击行看详情 · 双击改单格 · 底部可新增行' : '单击行看详情 · 右键复制/导出' }}
+        </span>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th class="row-num" scope="col" aria-label="行号">#</th>
-              <th v-for="col in props.result.columns" :key="col" scope="col">{{ col }}</th>
+              <th v-for="col in columns" :key="col" scope="col">{{ col }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, index) in props.result.rows" :key="index">
+            <tr
+              v-for="(row, index) in props.result.rows"
+              :key="index"
+              class="data-row"
+              :class="{ 'is-selected': selectedIndex === index }"
+              @click="selectRow(index)"
+            >
               <td class="row-num">{{ index + 1 }}</td>
               <td
-                v-for="col in props.result.columns"
+                v-for="col in columns"
                 :key="col"
                 class="cell"
                 :class="{
@@ -353,7 +482,7 @@ onMounted(async () => {
                   'is-editing': editing && editing.rowIndex === index && editing.col === col,
                   editable: canEdit(col),
                 }"
-                :title="canEdit(col) ? '双击编辑' : '右键复制'"
+                :title="canEdit(col) ? '双击编辑 · 右键复制' : '右键复制'"
                 tabindex="0"
                 @dblclick="startEdit(index, col, row)"
                 @contextmenu="onCellContextMenu($event, row, col)"
@@ -371,8 +500,91 @@ onMounted(async () => {
                 <template v-else>{{ cellText(row, col) }}</template>
               </td>
             </tr>
+
+            <!-- 新增行：可编辑网格底部常驻的空白行（对齐 Navicat 的 * 行） -->
+            <tr v-if="props.editable" class="draft-row">
+              <td class="row-num">
+                <span class="draft-mark" title="新增行">＋</span>
+              </td>
+              <td v-for="col in columns" :key="`draft-${col}`" class="cell">
+                <input
+                  v-model="draft[col]"
+                  class="cell-input draft-input"
+                  :aria-label="`新增行的 ${col} 列`"
+                  :placeholder="col"
+                  :disabled="props.inserting"
+                  @keydown="onDraftKeydown"
+                  @click.stop
+                />
+              </td>
+            </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- 行详情：单击某行后出现，点击任意值即可复制 -->
+      <div v-if="selectedRow" class="row-detail">
+        <div class="row-detail-head">
+          <strong>行详情</strong>
+          <span class="rd-pos">第 {{ (selectedIndex ?? 0) + 1 }} 行</span>
+          <span class="rd-hint">点击值即可复制</span>
+          <button
+            class="icon-btn"
+            type="button"
+            title="复制整行"
+            aria-label="复制整行"
+            @click="copyRow(selectedRow)"
+          >
+            <BaseIcon name="copy" :size="14" />
+          </button>
+          <button
+            class="icon-btn"
+            type="button"
+            title="关闭详情"
+            aria-label="关闭行详情"
+            @click="clearSelection"
+          >
+            <BaseIcon name="close" :size="14" />
+          </button>
+        </div>
+        <div class="row-detail-grid">
+          <button
+            v-for="col in columns"
+            :key="`rd-${col}`"
+            class="rd-item"
+            type="button"
+            :title="`点击复制 ${col}`"
+            @click="copyCell(selectedRow, col)"
+          >
+            <span class="rd-key">{{ col }}</span>
+            <span class="rd-val" :class="{ 'is-null': isNull(selectedRow, col) }">
+              {{ cellText(selectedRow, col) }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 新增行操作条：填了内容才高亮可点 -->
+      <div v-if="props.editable" class="draft-bar">
+        <span class="draft-tip">新增行：留空的列不写入（用默认值 / NULL），填完按 Enter 保存</span>
+        <button
+          class="ghost"
+          type="button"
+          :disabled="props.inserting || !draftFilled"
+          @click="clearDraft"
+        >
+          清空
+        </button>
+        <button
+          class="primary"
+          type="button"
+          :disabled="props.inserting || !draftFilled"
+          @click="saveDraft"
+        >
+          <span v-if="props.inserting" class="spinner" aria-hidden="true"></span>
+          <BaseIcon v-else name="plus" :size="14" />
+          <span>{{ props.inserting ? '写入中…' : '保存新行' }}</span>
+        </button>
       </div>
     </template>
   </div>

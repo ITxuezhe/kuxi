@@ -59,6 +59,8 @@ declare global {
       copyText(text: string): Promise<boolean>;
       exportConnections(): Promise<ConnectionExportOutcome>;
       importConnections(): Promise<ConnectionImportOutcome>;
+      /** 一键体验：创建并注册「示例库」连接，返回其 id 与是否新建 */
+      createDemoConnection(): Promise<{ id: string; created: boolean }>;
 
       // ---- 设置 ----
       getSettings(): Promise<AppSettings & { encryptionAvailable: boolean }>;

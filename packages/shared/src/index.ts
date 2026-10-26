@@ -15,6 +15,80 @@ export const DEFAULT_PORTS: Record<DbType, number> = {
   postgres: 5432,
 };
 
+/** 内置示例库的连接名（用于「一键体验示例库」去重判断） */
+export const DEMO_CONNECTION_NAME = '示例库 (Demo)';
+
+/**
+ * 内置示例库的建表 + 种子 SQL（users / products / orders）。
+ * 用于「一键体验示例库」：在 userData 目录创建 demo.sqlite 并填充示例数据，
+ * 让新用户在零配置下就能用自然语言或手写 SQL 体验产品。
+ * 全部用 IF NOT EXISTS / WHERE NOT EXISTS 保证可重复执行（幂等）。
+ */
+export const DEMO_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  city TEXT,
+  created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS products (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  price REAL NOT NULL,
+  stock INTEGER NOT NULL DEFAULT 0,
+  category TEXT
+);
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  product_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL,
+  amount REAL NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT
+);
+-- 幂等种子：用 id 做行级去重，重复执行不会重复插入，也不会因首行已存在而吞掉后续行
+INSERT INTO users (id, name, email, city, created_at)
+SELECT 1, '张伟', 'zhangwei@example.com', '北京', '2024-01-15' WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 1);
+INSERT INTO users (id, name, email, city, created_at)
+SELECT 2, '李娜', 'lina@example.com', '上海', '2024-02-20' WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 2);
+INSERT INTO users (id, name, email, city, created_at)
+SELECT 3, '王强', 'wangqiang@example.com', '广州', '2024-03-11' WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 3);
+INSERT INTO users (id, name, email, city, created_at)
+SELECT 4, '刘洋', 'liuyang@example.com', '深圳', '2024-04-02' WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 4);
+INSERT INTO users (id, name, email, city, created_at)
+SELECT 5, '陈静', 'chenjing@example.com', '杭州', '2024-05-18' WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 5);
+INSERT INTO products (id, name, price, stock, category)
+SELECT 1, '机械键盘', 399.0, 120, '数码' WHERE NOT EXISTS (SELECT 1 FROM products WHERE id = 1);
+INSERT INTO products (id, name, price, stock, category)
+SELECT 2, '无线鼠标', 129.0, 200, '数码' WHERE NOT EXISTS (SELECT 1 FROM products WHERE id = 2);
+INSERT INTO products (id, name, price, stock, category)
+SELECT 3, '《数据库系统概念》', 89.0, 60, '图书' WHERE NOT EXISTS (SELECT 1 FROM products WHERE id = 3);
+INSERT INTO products (id, name, price, stock, category)
+SELECT 4, '有机绿茶', 58.0, 300, '食品' WHERE NOT EXISTS (SELECT 1 FROM products WHERE id = 4);
+INSERT INTO products (id, name, price, stock, category)
+SELECT 5, '人体工学椅', 899.0, 40, '家具' WHERE NOT EXISTS (SELECT 1 FROM products WHERE id = 5);
+INSERT INTO products (id, name, price, stock, category)
+SELECT 6, '降噪耳机', 699.0, 80, '数码' WHERE NOT EXISTS (SELECT 1 FROM products WHERE id = 6);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 1, 1, 1, 1, 399.0, '已完成', '2024-06-01' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 1);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 2, 2, 3, 2, 178.0, '已发货', '2024-06-05' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 2);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 3, 3, 2, 1, 129.0, '已完成', '2024-06-10' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 3);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 4, 4, 6, 1, 699.0, '待付款', '2024-06-12' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 4);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 5, 5, 4, 3, 174.0, '已发货', '2024-06-15' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 5);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 6, 1, 5, 1, 899.0, '已完成', '2024-06-20' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 6);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 7, 2, 6, 2, 1398.0, '已发货', '2024-06-22' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 7);
+INSERT INTO orders (id, user_id, product_id, quantity, amount, status, created_at)
+SELECT 8, 3, 1, 2, 798.0, '已完成', '2024-06-25' WHERE NOT EXISTS (SELECT 1 FROM orders WHERE id = 8);
+`;
+
 /**
  * 连接配置。
  * password 字段仅用于传输；落盘时由 Electron Main 进程加密，绝不下发到渲染进程。
@@ -146,6 +220,8 @@ export const IPC = {
   ExportConnections: 'conn:export',
   /** 从 JSON 文件导入连接配置 */
   ImportConnections: 'conn:import',
+  /** 一键创建并连接内置示例库（userData/demo.sqlite，含 users/products/orders 种子数据） */
+  CreateDemoConnection: 'conn:create-demo',
   /** 应用级设置（当前仅只读模式） */
   GetSettings: 'settings:get',
   SetSettings: 'settings:set',
