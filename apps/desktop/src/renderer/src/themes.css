@@ -1,0 +1,235 @@
+/* ============================================================================
+ * themes.css — 主题与密度变量定义
+ *
+ * 设计决策：
+ * 1. 所有颜色/间距一律通过 CSS 自定义属性（变量）下发，组件样式只消费变量，
+ *    因此切换主题只需改 <html data-theme="...">，浏览器会即时重绘，无需重渲染组件。
+ * 2. 主题选择器用 `html[data-theme='x']`（而非 :root）以便优先级稳定地覆盖默认值，
+ *    默认主题（dark）同时写在 :root 上，保证 JS 尚未执行时也有正确的兜底配色。
+ * 3. 密度（density）与主题正交：通过 <html data-density="..."> 独立控制间距/行高/字号，
+ *    两者可任意组合。
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+ * 默认（兜底）变量 —— 等价于 dark 主题，避免 JS 执行前出现无样式闪烁
+ * ------------------------------------------------------------------------- */
+:root {
+
+  /* 背景层级：最底 → 面板 → 面板内嵌块 → 悬浮/激活块 */
+  --bg: #1b1d23;
+  --panel: #23262e;
+  --panel-2: #2a2e37;
+  --panel-3: #333844;
+
+  /* 描边 */
+  --border: #343945;
+  --border-strong: #454b59;
+
+  /* 文本 */
+  --text: #e4e7ee;
+  --muted: #8b93a7;
+
+  /* 主色与语义色 */
+  --primary: #1666c4;
+  --primary-hover: #1a78e0;
+  --primary-soft: rgba(22, 102, 196, 0.14);
+  --on-primary: #ffffff;
+  --danger: #e05555;
+  --danger-hover: #cf4242;
+  --danger-soft: rgba(224, 85, 85, 0.1);
+  --ok: #3fb950;
+  --ok-soft: rgba(63, 185, 80, 0.12);
+  --warn: #d9a441;
+  --warn-soft: rgba(217, 164, 65, 0.12);
+
+  /* 阴影与遮罩 */
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.42);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.28);
+
+  /* 滚动条 */
+  --scroll-thumb: #3d4350;
+}
+
+/* ---------------------------------------------------------------------------
+ * 1) dark —— 深色（默认）
+ * ------------------------------------------------------------------------- */
+html[data-theme='dark'] {
+  --bg: #1b1d23;
+  --panel: #23262e;
+  --panel-2: #2a2e37;
+  --panel-3: #333844;
+  --border: #343945;
+  --border-strong: #454b59;
+  --text: #e4e7ee;
+  --muted: #8b93a7;
+  --primary: #1666c4;
+  --primary-hover: #1a78e0;
+  --primary-soft: rgba(22, 102, 196, 0.14);
+  --on-primary: #ffffff;
+  --danger: #e05555;
+  --danger-hover: #cf4242;
+  --danger-soft: rgba(224, 85, 85, 0.1);
+  --ok: #3fb950;
+  --ok-soft: rgba(63, 185, 80, 0.12);
+  --warn: #d9a441;
+  --warn-soft: rgba(217, 164, 65, 0.12);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.42);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.28);
+  --scroll-thumb: #3d4350;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2) light —— 浅色
+ * ------------------------------------------------------------------------- */
+html[data-theme='light'] {
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --panel-2: #f0f2f6;
+  --panel-3: #e4e8ef;
+  --border: #dce0e8;
+  --border-strong: #c3c9d4;
+  --text: #1f2329;
+  --muted: #6b7280;
+  --primary: #1666c4;
+  --primary-hover: #0f55a6;
+  --primary-soft: rgba(22, 102, 196, 0.1);
+  --on-primary: #ffffff;
+  --danger: #d9363e;
+  --danger-hover: #b62a31;
+  --danger-soft: rgba(217, 54, 62, 0.08);
+  --ok: #1a7f37;
+  --ok-soft: rgba(26, 127, 55, 0.1);
+  --warn: #9a6700;
+  --warn-soft: rgba(154, 103, 0, 0.1);
+  --shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --scroll-thumb: #c8cdd7;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3) midnight —— 深蓝紫
+ * ------------------------------------------------------------------------- */
+html[data-theme='midnight'] {
+  --bg: #12101f;
+  --panel: #1a1730;
+  --panel-2: #221d3d;
+  --panel-3: #2c2451;
+  --border: #342c5c;
+  --border-strong: #4a3f80;
+  --text: #e8e4ff;
+  --muted: #9a92c4;
+  --primary: #7c5cff;
+  --primary-hover: #9277ff;
+  --primary-soft: rgba(124, 92, 255, 0.16);
+  --on-primary: #ffffff;
+  --danger: #ff5f6d;
+  --danger-hover: #e5485a;
+  --danger-soft: rgba(255, 95, 109, 0.12);
+  --ok: #43d9a3;
+  --ok-soft: rgba(67, 217, 163, 0.12);
+  --warn: #ffb86b;
+  --warn-soft: rgba(255, 184, 107, 0.12);
+  --shadow: 0 12px 32px rgba(6, 3, 24, 0.6);
+  --shadow-sm: 0 2px 8px rgba(6, 3, 24, 0.45);
+  --scroll-thumb: #3d3470;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4) forest —— 深绿
+ * ------------------------------------------------------------------------- */
+html[data-theme='forest'] {
+  --bg: #0f1a14;
+  --panel: #142219;
+  --panel-2: #1a2d21;
+  --panel-3: #22392b;
+  --border: #2a4433;
+  --border-strong: #3a5c46;
+  --text: #dcf0e2;
+  --muted: #86a893;
+  --primary: #2fa96b;
+  --primary-hover: #38c47c;
+  --primary-soft: rgba(47, 169, 107, 0.16);
+  --on-primary: #06130c;
+  --danger: #e5674f;
+  --danger-hover: #c84f37;
+  --danger-soft: rgba(229, 103, 79, 0.12);
+  --ok: #4ade80;
+  --ok-soft: rgba(74, 222, 128, 0.12);
+  --warn: #e3b341;
+  --warn-soft: rgba(227, 179, 65, 0.12);
+  --shadow: 0 12px 32px rgba(3, 12, 7, 0.55);
+  --shadow-sm: 0 2px 8px rgba(3, 12, 7, 0.4);
+  --scroll-thumb: #35553f;
+}
+
+/* ---------------------------------------------------------------------------
+ * 密度变量（与主题正交）
+ * comfortable：默认，间距宽松、行高舒适
+ * compact：紧凑，一屏显示更多行/字段
+ *
+ * 字号不再写死：--font-size / --font-sm 由「密度基准字号 × --font-scale」得出，
+ * 于是「字号」档位（见下方 fontsize 段）能整体缩放而无需每个组件单独判断。
+ * 需要跟字号一起长的尺寸（控件内边距、行高内边距、顶栏高度、编辑器高度）
+ * 也统一乘 --font-scale，避免大字号下按钮/表格行被挤压变形。
+ * ------------------------------------------------------------------------- */
+html[data-density='comfortable'],
+:root {
+  --gap: 10px;
+  --gap-sm: 8px;
+  --gap-xs: 6px;
+  --pad-panel: 14px;
+  --pad-card: 10px;
+  --ctrl-py: calc(6px * var(--font-scale));
+  --ctrl-px: 10px;
+  /* 15px 为舒适档基准（原先 13px 在 macOS 高分屏偏小） */
+  --font-size: calc(15px * var(--font-scale));
+  --font-sm: calc(12.5px * var(--font-scale));
+  --row-py: calc(6px * var(--font-scale));
+  --row-px: 10px;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --line-height: 1.5;
+  --editor-height: calc(180px * var(--font-scale));
+  --sidebar-width: 320px;
+  --topbar-h: calc(42px * var(--font-scale));
+}
+
+html[data-density='compact'] {
+  --gap: 6px;
+  --gap-sm: 5px;
+  --gap-xs: 4px;
+  --pad-panel: 10px;
+  --pad-card: 7px;
+  --ctrl-py: calc(3px * var(--font-scale));
+  --ctrl-px: 8px;
+  --font-size: calc(13px * var(--font-scale));
+  --font-sm: calc(11.5px * var(--font-scale));
+  --row-py: calc(3px * var(--font-scale));
+  --row-px: 8px;
+  --radius: 6px;
+  --radius-sm: 4px;
+  --line-height: 1.35;
+  --editor-height: calc(140px * var(--font-scale));
+  --sidebar-width: 290px;
+  --topbar-h: calc(34px * var(--font-scale));
+}
+
+/* ---------------------------------------------------------------------------
+ * 字号档位（与主题、密度均正交）
+ * 只调整缩放系数 --font-scale，字号/内边距/顶栏高度自动跟随。
+ * 默认 md：comfortable 下正文 15px、次要文字 12.5px。
+ * ------------------------------------------------------------------------- */
+html[data-fontsize='sm'] {
+  --font-scale: 0.9;
+}
+html[data-fontsize='md'],
+:root {
+  --font-scale: 1;
+}
+html[data-fontsize='lg'] {
+  --font-scale: 1.15;
+}
+html[data-fontsize='xl'] {
+  --font-scale: 1.3;
+}
+

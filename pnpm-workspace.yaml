@@ -1,0 +1,9 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm 12 精确放行需要执行构建脚本的依赖（默认忽略 build scripts）
+# esbuild: tsx / vite 依赖；electron: 安装时下载对应平台二进制
+allowBuilds:
+  esbuild: true
+  electron: true

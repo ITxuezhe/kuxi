@@ -1,0 +1,26 @@
+{
+  "name": "@kuxi/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview"
+  },
+  "dependencies": {
+    "@kuxi/core": "workspace:*",
+    "@kuxi/shared": "workspace:*",
+    "mysql2": "^3.11.3",
+    "pg": "^8.13.1",
+    "sql-formatter": "^15.4.2",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "electron": "^35.0.0",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

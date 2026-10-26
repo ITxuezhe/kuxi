@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-density="comfortable" data-fontsize="md">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>库犀 · 用大白话问数据库</title>
+    <!--
+      首帧前同步已持久化的主题/密度/字号，避免刷新时先闪一下默认配色与字号。
+      逻辑与 composables/useTheme.ts 的 localStorage key / 合法值保持一致，
+      非法值一律丢弃（回落到 html 标签上的默认属性）。任何异常都静默忽略。
+    -->
+    <script>
+      (function () {
+        var THEMES = ['dark', 'light', 'midnight', 'forest'];
+        var DENSITIES = ['comfortable', 'compact'];
+        var FONTSIZES = ['sm', 'md', 'lg', 'xl'];
+        function apply(key, attr, allowed) {
+          try {
+            var value = window.localStorage.getItem(key);
+            if (value && allowed.indexOf(value) !== -1) {
+              document.documentElement.setAttribute(attr, value);
+            }
+          } catch (e) {
+            /* 忽略：使用 html 标签上的默认值 */
+          }
+        }
+        apply('kuxi-theme', 'data-theme', THEMES);
+        apply('kuxi-density', 'data-density', DENSITIES);
+        apply('kuxi-fontsize', 'data-fontsize', FONTSIZES);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

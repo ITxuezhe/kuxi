@@ -1,0 +1,19 @@
+{
+  "name": "kuxi",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @kuxi/desktop dev",
+    "build": "pnpm --filter @kuxi/desktop build",
+    "test:core": "pnpm --filter @kuxi/core test",
+    "harness": "pnpm --filter @kuxi/core harness",
+    "typecheck": "pnpm --filter @kuxi/core exec tsc -p ../shared/tsconfig.json --noEmit && pnpm --filter @kuxi/core exec tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  }
+}
