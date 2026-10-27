@@ -9,7 +9,7 @@
  *
  * 复用：设计表标签（DesignTab）与遗留的 Modal 封装（TableDesigner.vue）共用本表单。
  */
-import { nextTick, ref, watch, type Ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import type { DbType } from '@kuxi/shared';
 import { generateCreateTable, TYPE_OPTIONS, type FieldDef } from '../utils/sql';
 import { useToast } from '../composables/useToast';

@@ -192,6 +192,7 @@ export function coerceValue(raw: string, oldValue: unknown): unknown {
  * @param column 被修改的列
  * @param newValue 用户输入的新值（字符串）
  * @param oldValue 旧值（用于类型推断）
+ * @param setNull 显式置为 NULL（右键「设为 NULL」），此时忽略 newValue
  */
 export function generateUpdate(
   dialect: DbType,
@@ -201,8 +202,9 @@ export function generateUpdate(
   column: string,
   newValue: string,
   oldValue: unknown,
+  setNull = false,
 ): string {
-  const value = coerceValue(newValue, oldValue);
+  const value = setNull ? null : coerceValue(newValue, oldValue);
   return (
     `UPDATE ${quoteIdent(dialect, table)} SET ${quoteIdent(dialect, column)} = ` +
     `${quoteValue(value, dialect)} WHERE ${quoteIdent(dialect, pkCol)} = ${quoteValue(pkValue, dialect)};`
@@ -243,4 +245,71 @@ export function generateInsert(
     })
     .join(', ');
   return `INSERT INTO ${quoteIdent(dialect, table)} (${columnsSql}) VALUES (${valuesSql});`;
+}
+
+/**
+ * 生成删除行对应的 DELETE 语句（主键定位单行，只删这一行）。
+ *
+ * @param dialect 方言
+ * @param table 表名
+ * @param pkCol 主键列名
+ * @param pkValue 该行主键值
+ */
+export function generateDelete(
+  dialect: DbType,
+  table: string,
+  pkCol: string,
+  pkValue: unknown,
+): string {
+  return (
+    `DELETE FROM ${quoteIdent(dialect, table)} ` +
+    `WHERE ${quoteIdent(dialect, pkCol)} = ${quoteValue(pkValue, dialect)};`
+  );
+}
+
+/**
+ * 剥掉网格 SQL 里的排序与分页尾巴，还原成干净的主体（含 LIMIT 时保留）。
+ * 仅针对本应用生成的网格 SQL（SELECT ... FROM t [WHERE ...] [ORDER BY ...] LIMIT n），
+ * 不做通用 SQL 解析；字符串字面量里恰好含 "ORDER BY" 的极端情况不支持。
+ *
+ * @param sql 网格 SQL
+ */
+export function stripSqlOrder(sql: string): string {
+  let body = sql.trim().replace(/;\s*$/, '');
+  let limitSql = '';
+  const limitM = body.match(/\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$/i);
+  if (limitM) {
+    limitSql = limitM[0].trim();
+    body = body.slice(0, limitM.index).trim();
+  }
+  // 贪婪前缀使 ORDER BY 匹配最后一个（近似顶层）
+  const obM = body.match(/^([\s\S]*)\s+ORDER\s+BY\s+[\s\S]*$/i);
+  if (obM) body = obM[1].trim();
+  return `${body}${limitSql ? ` ${limitSql}` : ''};`;
+}
+
+/**
+ * 给网格 SQL 应用列排序：剥掉已有 ORDER BY / LIMIT 后重组为
+ * SELECT ... ORDER BY 列 方向 LIMIT n [OFFSET m]（ORDER BY 必须在 LIMIT 前）。
+ *
+ * @param sql 网格 SQL
+ * @param column 排序列名
+ * @param dir 排序方向
+ * @param dialect 方言（决定列名引号风格）
+ */
+export function applySortToSql(
+  sql: string,
+  column: string,
+  dir: 'asc' | 'desc',
+  dialect: DbType,
+): string {
+  const base = stripSqlOrder(sql).replace(/;\s*$/, '');
+  let limitSql = '';
+  const limitM = base.match(/\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$/i);
+  if (limitM) limitSql = limitM[0].trim();
+  const body = limitM ? base.slice(0, limitM.index).trim() : base;
+  return (
+    `${body} ORDER BY ${quoteIdent(dialect, column)} ${dir === 'desc' ? 'DESC' : 'ASC'}` +
+    `${limitSql ? ` ${limitSql}` : ''};`
+  );
 }

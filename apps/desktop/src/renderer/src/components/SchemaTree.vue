@@ -33,6 +33,8 @@ const emit = defineEmits<{
   /** 双击表：打开数据网格（携带主键列，供可编辑网格生成 UPDATE 定位行） */
   (e: 'open', table: string, pkColumns: string[]): void;
   (e: 'create'): void;
+  /** 右键「设计表」：在设计标签页中打开该表（v1 仍为新建向导，预填表名） */
+  (e: 'design', table: string): void;
   (e: 'drop', table: string): void;
 }>();
 
@@ -117,6 +119,7 @@ function openTable(table: string): void {
 function onTableContextMenu(event: MouseEvent, table: string): void {
   openContextMenu(event, [
     { label: '打开数据', action: () => openTable(table) },
+    { label: '设计表', action: () => emit('design', table) },
     { label: '生成 SELECT 查询', action: () => pickTable(table) },
     { label: '复制表名', action: () => void copyTableName(table) },
     { label: '删除表', separator: true, danger: true, action: () => emit('drop', table) },

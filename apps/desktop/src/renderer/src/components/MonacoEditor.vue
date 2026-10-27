@@ -1,3 +1,26 @@
+<script lang="ts">
+/**
+ * 编辑器高度：模块级共享（所有查询标签实例同步），localStorage 持久化。
+ * 由底部拖拽分隔条调节；双击分隔条恢复默认。
+ */
+import { ref } from 'vue';
+
+const EDITOR_HEIGHT_KEY = 'kuxi.editorHeight';
+export const EDITOR_HEIGHT_DEFAULT = 180;
+export const EDITOR_HEIGHT_MIN = 96;
+
+function loadEditorHeight(): number {
+  try {
+    const n = Number(localStorage.getItem(EDITOR_HEIGHT_KEY));
+    return Number.isFinite(n) && n >= EDITOR_HEIGHT_MIN ? n : EDITOR_HEIGHT_DEFAULT;
+  } catch {
+    return EDITOR_HEIGHT_DEFAULT;
+  }
+}
+
+const editorHeight = ref<number>(loadEditorHeight());
+</script>
+
 <script setup lang="ts">
 /**
  * MonacoEditor — 基于 Monaco 的 SQL 编辑器（替换原 textarea 版 SqlEditor）
@@ -10,6 +33,8 @@
  * - 自定义右键菜单（禁用 Monaco 原生 contextmenu，复用应用统一的 DOM 菜单）
  * - 选区感知：执行选中 / 格式化 / AI 优化 / AI 解释都按"选区优先，否则全文"
  * - 主题与字号跟随 useTheme，零硬编码颜色
+ * - 空态提示用 Monaco 原生 placeholder（不再用 DOM 覆盖层，杜绝重叠）
+ * - 底部分隔条可拖拽调高度（持久化，所有标签同步）
  */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { monaco, applyMonacoTheme } from '../monaco-setup';
@@ -97,12 +122,62 @@ function showMenu(event: MouseEvent): void {
   ]);
 }
 
+/** 底部分隔条拖拽状态 */
+const dragging = ref(false);
+let resizeStartY = 0;
+let resizeStartH = 0;
+
+function startResize(ev: PointerEvent): void {
+  ev.preventDefault();
+  dragging.value = true;
+  resizeStartY = ev.clientY;
+  resizeStartH = editorHeight.value;
+  (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
+  document.body.classList.add('editor-resizing');
+}
+
+function onResizeMove(ev: PointerEvent): void {
+  if (!dragging.value) return;
+  const maxH = Math.round(window.innerHeight * 0.75);
+  // 分隔条在编辑器底部：向下拖（clientY 增大）→ 编辑器增高
+  editorHeight.value = Math.round(
+    Math.max(EDITOR_HEIGHT_MIN, Math.min(resizeStartH + (ev.clientY - resizeStartY), maxH)),
+  );
+}
+
+function endResize(ev: PointerEvent): void {
+  if (!dragging.value) return;
+  dragging.value = false;
+  try {
+    (ev.currentTarget as HTMLElement).releasePointerCapture(ev.pointerId);
+  } catch {
+    /* capture 可能已随元素卸载释放 */
+  }
+  document.body.classList.remove('editor-resizing');
+  try {
+    localStorage.setItem(EDITOR_HEIGHT_KEY, String(editorHeight.value));
+  } catch {
+    /* 存储不可用时静默降级（本会话内仍生效） */
+  }
+}
+
+/** 双击分隔条恢复默认高度 */
+function resetHeight(): void {
+  editorHeight.value = EDITOR_HEIGHT_DEFAULT;
+  try {
+    localStorage.removeItem(EDITOR_HEIGHT_KEY);
+  } catch {
+    /* 同上 */
+  }
+}
+
 onMounted(() => {
   if (!containerRef.value) return;
   editor = monaco.editor.create(containerRef.value, {
     value: props.modelValue,
     language: 'sql',
     theme: `kuxi-${theme.value}`,
+    placeholder: 'SELECT * FROM ...',
     automaticLayout: true,
     minimap: { enabled: false },
     fontSize: FONT_PX[fontSize.value],
@@ -175,8 +250,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="editor">
-    <div ref="containerRef" class="monaco-host"></div>
-    <div v-if="!modelValue" class="editor-ph" aria-hidden="true">SELECT * FROM ...</div>
+    <div ref="containerRef" class="monaco-host" :style="{ height: `${editorHeight}px` }"></div>
+    <div
+      class="editor-drag"
+      :class="{ dragging }"
+      title="拖动调整编辑器高度 · 双击恢复默认"
+      @pointerdown="startResize"
+      @pointermove="onResizeMove"
+      @pointerup="endResize"
+      @pointercancel="endResize"
+      @dblclick="resetHeight"
+    ></div>
     <div class="editor-foot">
       <span>
         <span class="kbd">{{ modifierKey }}</span>

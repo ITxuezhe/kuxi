@@ -35,6 +35,12 @@ const props = withDefaults(
     tableName?: string;
     /** 主键列（定位行的 WHERE 条件） */
     pkColumns?: string[];
+    /** 列类型标注（来自 schema，如 INTEGER/TEXT/varchar(255)）；查询标签无 schema 时不传 */
+    columnTypes?: Record<string, string>;
+    /** 列头是否可点击排序（数据标签为 true） */
+    sortable?: boolean;
+    /** 当前排序列与方向（显示 ▲/▼ 指示） */
+    sortState?: { col: string; dir: 'asc' | 'desc' } | null;
     /** 正在写入新增行（按钮 loading 态） */
     inserting?: boolean;
   }>(),
@@ -44,16 +50,25 @@ const props = withDefaults(
     editable: false,
     tableName: '',
     pkColumns: () => [],
+    columnTypes: () => ({}),
+    sortable: false,
+    sortState: null,
     inserting: false,
   },
 );
 
 const emit = defineEmits<{
   'update-cell': [
-    payload: { column: string; newValue: string; oldValue: unknown; pkValue: unknown },
+    payload: { column: string; newValue: string; oldValue: unknown; pkValue: unknown; setNull?: boolean },
   ];
   /** 提交新增行：只带用户真填了的列 */
   'insert-row': [payload: { values: Record<string, string>; numericColumns: string[] }];
+  /** 点击列头排序：next 为 '' 表示清除排序 */
+  sort: [column: string, next: 'asc' | 'desc' | ''];
+  /** 删除该行（主键值） */
+  'delete-row': [pkValue: unknown];
+  /** 提交全部暂存的单元格修改 */
+  'commit-changes': [changes: StagedChange[]];
 }>();
 
 const { copy } = useClipboard();
@@ -66,6 +81,53 @@ const exporters = ref<ExporterInfo[]>([]);
 const editing = ref<{ rowIndex: number; col: string } | null>(null);
 const editValue = ref('');
 const editInputRef = ref<HTMLInputElement | null>(null);
+
+/**
+ * 暂存的单元格修改（TablePlus 式：编辑不立即写库）。
+ * 键为 `${rowIndex}:${col}`，值为该处修改的完整上下文，提交时批量生成 UPDATE。
+ */
+interface StagedChange {
+  rowIndex: number;
+  col: string;
+  oldValue: unknown;
+  newValue: string;
+  /** 显式置 NULL（右键「设为 NULL」），提交时忽略 newValue */
+  setNull: boolean;
+  /** 该行主键值（UPDATE 的 WHERE 定位） */
+  pkValue: unknown;
+}
+const staged = ref<Map<string, StagedChange>>(new Map());
+const stagedKey = (rowIndex: number, col: string): string => `${rowIndex}:${col}`;
+const stagedCount = computed<number>(() => staged.value.size);
+
+function stagedChange(rowIndex: number, col: string): StagedChange | undefined {
+  return staged.value.get(stagedKey(rowIndex, col));
+}
+
+/** 单元格展示文本：有暂存修改时显示暂存值（NULL 显示为 NULL 字样） */
+function stagedCellText(row: Record<string, unknown>, rowIndex: number, col: string): string {
+  const pending = stagedChange(rowIndex, col);
+  if (!pending) return cellText(row, col);
+  return pending.setNull ? 'NULL' : pending.newValue;
+}
+
+/** 暂存一处修改（值与当前已暂存内容相同则不再暂存） */
+function stageChange(change: StagedChange): void {
+  const cur = stagedChange(change.rowIndex, change.col);
+  if (cur && cur.setNull === change.setNull && cur.newValue === change.newValue) return;
+  staged.value.set(stagedKey(change.rowIndex, change.col), change);
+}
+
+/** 放弃全部暂存修改（只影响界面，不触碰数据库） */
+function discardStaged(): void {
+  staged.value.clear();
+}
+
+/** 提交全部暂存修改：交给 useWorkbench 批量生成并执行 UPDATE */
+function commitStaged(): void {
+  if (!stagedCount.value) return;
+  emit('commit-changes', [...staged.value.values()]);
+}
 
 /** 当前选中的行下标（行详情面板的数据源） */
 const selectedIndex = ref<number | null>(null);
@@ -105,6 +167,85 @@ const isEmpty = computed<boolean>(
 /** 列名列表（空态保护，模板里反复用） */
 const columns = computed<string[]>(() => props.result?.columns ?? []);
 
+/** 取某列的类型标注（无 schema 信息时返回空串，列头就不显示） */
+function colType(col: string): string {
+  return props.columnTypes[col] ?? '';
+}
+
+/** 取某列的类型标注（行详情用） */
+function isPk(col: string): boolean {
+  return props.pkColumns.includes(col);
+}
+
+/**
+ * schema 类型是否为数值族。
+ * 比"扫数据推断"可靠：空表扫不到任何值，会把数字列全判成文本。
+ */
+const NUMERIC_TYPE_RE =
+  /^(int|integer|bigint|smallint|tinyint|mediumint|decimal|numeric|float|real|double|number|serial|money)/i;
+
+function typeIsNumeric(col: string): boolean {
+  return NUMERIC_TYPE_RE.test(props.columnTypes[col] ?? '');
+}
+
+/** 点击列头：'' → asc → desc → '' 循环切换 */
+function onSortClick(col: string): void {
+  if (!props.sortable) return;
+  const current = props.sortState?.col === col ? props.sortState.dir : '';
+  const next = current === '' ? 'asc' : current === 'asc' ? 'desc' : '';
+  emit('sort', col, next);
+}
+
+/** 行右键菜单项：可编辑网格额外提供「设为 NULL」与「删除此行」（Navicat 标配） */
+function onCellContextMenu(
+  event: MouseEvent,
+  row: Record<string, unknown>,
+  rowIndex: number,
+  col: string,
+): void {
+  const pkValue = props.pkColumns.length ? row[props.pkColumns[0]] : undefined;
+  const canLocate = props.editable && props.pkColumns.length > 0;
+
+  const editItems = canLocate
+    ? [
+        ...(isNull(row, col) || props.pkColumns.includes(col)
+          ? []
+          : [
+              {
+                label: '设为 NULL',
+                action: () =>
+                  stageChange({
+                    rowIndex,
+                    col,
+                    oldValue: row[col],
+                    newValue: '',
+                    setNull: true,
+                    pkValue,
+                  }),
+              },
+            ]),
+        {
+          label: '删除此行',
+          separator: true,
+          action: () => emit('delete-row', pkValue),
+        },
+      ]
+    : [];
+
+  const exportItems = exporters.value.map((exporter, index) => ({
+    label: `导出 ${exporter.label}`,
+    separator: index === 0 && editItems.length === 0,
+    action: () => void exportWith(exporter),
+  }));
+
+  openContextMenu(event, [
+    { label: '复制单元格', action: () => void copyCell(row, col) },
+    { label: '复制整行', action: () => void copyRow(row) },
+    ...editItems,
+    ...exportItems,
+  ]);
+}
+
 /** 当前选中的行数据 */
 const selectedRow = computed<Record<string, unknown> | null>(() => {
   if (selectedIndex.value === null || !props.result) return null;
@@ -117,7 +258,8 @@ const draftFilled = computed<boolean>(() =>
 );
 
 /**
- * 从现有数据推断数值列：该列至少有一行是 number，且没有一行是字符串。
+ * 数值列判定：schema 类型优先（可靠、空表也正确），无类型信息时退回
+ * "扫数据推断"（该列至少一行是 number 且没有一行是字符串）。
  * 用于 INSERT 时把 "1399" 写成数字而不是字符串（SQLite 弱类型会悄悄把数字存成文本）。
  */
 const numericColumns = computed<Set<string>>(() => {
@@ -125,6 +267,10 @@ const numericColumns = computed<Set<string>>(() => {
   const set = new Set<string>();
   if (!result) return set;
   for (const col of result.columns) {
+    if (props.tableName && typeIsNumeric(col)) {
+      set.add(col);
+      continue;
+    }
     let sawNumber = false;
     let sawText = false;
     for (const row of result.rows) {
@@ -241,20 +387,27 @@ function startEdit(rowIndex: number, col: string, row: Record<string, unknown>):
     return;
   }
   editing.value = { rowIndex, col };
-  editValue.value = rawToEdit(row[col]);
+  // 已暂存的修改优先作为编辑起点（重新编辑不丢暂存内容）
+  const pending = stagedChange(rowIndex, col);
+  editValue.value = rawToEdit(pending ? (pending.setNull ? null : pending.newValue) : row[col]);
   void nextTick(() => editInputRef.value?.select());
 }
 
-/** 提交编辑：把 {列, 新值, 旧值, 主键值} 交给 App 生成 UPDATE */
+/** 结束编辑：改动进暂存区（不立即写库），由「提交全部」批量落库 */
 function commitEdit(row: Record<string, unknown>): void {
   if (!editing.value) return;
-  const { col } = editing.value;
+  const { rowIndex, col } = editing.value;
   const newValue = editValue.value;
   const oldValue = row[col];
   const pkValue = props.pkColumns.length ? row[props.pkColumns[0]] : undefined;
   editing.value = null;
-  if (rawToEdit(oldValue) === newValue) return; // 没改，不提交
-  emit('update-cell', { column: col, newValue, oldValue, pkValue });
+  // 与库里现值相同（且该处没有暂存 NULL 标记）→ 无需暂存
+  const pending = stagedChange(rowIndex, col);
+  if (!pending?.setNull && rawToEdit(oldValue) === newValue) {
+    staged.value.delete(stagedKey(rowIndex, col));
+    return;
+  }
+  stageChange({ rowIndex, col, oldValue, newValue, setNull: false, pkValue });
 }
 
 /** 取消编辑 */
@@ -310,26 +463,6 @@ function onDraftKeydown(event: KeyboardEvent): void {
 }
 
 /**
- * 单元格右键：复制单元格 / 复制整行 / 导出（按可用导出插件动态列出）。
- * @param event 鼠标事件
- * @param row 行数据
- * @param col 列名
- */
-function onCellContextMenu(event: MouseEvent, row: Record<string, unknown>, col: string): void {
-  const exportItems = exporters.value.map((exporter, index) => ({
-    label: `导出 ${exporter.label}`,
-    separator: index === 0,
-    action: () => void exportWith(exporter),
-  }));
-
-  openContextMenu(event, [
-    { label: '复制单元格', action: () => void copyCell(row, col) },
-    { label: '复制整行', action: () => void copyRow(row) },
-    ...exportItems,
-  ]);
-}
-
-/**
  * 用指定导出插件导出当前结果（主进程序列化 + 弹保存框 + 落盘）。
  * @param exporter 导出插件
  */
@@ -363,13 +496,15 @@ function defaultBaseName(): string {
 }
 
 /**
- * 每次拿到新结果就重置选中与草稿：避免"上一次查询选中的第 5 行"
- * 在今天这次结果里继续高亮，也避免草稿里残留旧列。
+ * 每次拿到新结果就重置选中、草稿与暂存：避免"上一次查询选中的第 5 行"
+ * 在今天这次结果里继续高亮，也避免草稿/暂存里残留旧数据。
+ * 注意：暂存的修改在提交成功后由结果刷新自然清空；提交失败不刷新结果，暂存保留。
  */
 watch(
   () => props.result,
   () => {
     selectedIndex.value = null;
+    staged.value.clear();
     editing.value = null;
     clearDraft();
   },
@@ -461,7 +596,25 @@ onMounted(async () => {
           <thead>
             <tr>
               <th class="row-num" scope="col" aria-label="行号">#</th>
-              <th v-for="col in columns" :key="col" scope="col">{{ col }}</th>
+              <th
+                v-for="col in columns"
+                :key="col"
+                scope="col"
+                :class="{ sortable: props.sortable }"
+                :title="props.sortable ? '点击排序：升序 → 降序 → 取消' : undefined"
+                @click="onSortClick(col)"
+              >
+                <span class="th-name">
+                  {{ col }}
+                  <span v-if="isPk(col)" class="th-pk" title="主键">PK</span>
+                  <span
+                    v-if="props.sortState?.col === col"
+                    class="th-arrow"
+                    aria-hidden="true"
+                  >{{ props.sortState.dir === 'asc' ? '▲' : '▼' }}</span>
+                </span>
+                <span v-if="colType(col)" class="th-type">{{ colType(col) }}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -478,14 +631,21 @@ onMounted(async () => {
                 :key="col"
                 class="cell"
                 :class="{
-                  'cell-null': isNull(row, col),
+                  'cell-null': isNull(row, col) && !stagedChange(index, col),
+                  'cell-staged': Boolean(stagedChange(index, col)),
                   'is-editing': editing && editing.rowIndex === index && editing.col === col,
                   editable: canEdit(col),
                 }"
-                :title="canEdit(col) ? '双击编辑 · 右键复制' : '右键复制'"
+                :title="
+                  stagedChange(index, col)
+                    ? '已修改（未提交）· 双击继续编辑'
+                    : canEdit(col)
+                      ? '双击编辑 · 右键复制'
+                      : '右键复制'
+                "
                 tabindex="0"
                 @dblclick="startEdit(index, col, row)"
-                @contextmenu="onCellContextMenu($event, row, col)"
+                @contextmenu="onCellContextMenu($event, row, index, col)"
               >
                 <input
                   v-if="editing && editing.rowIndex === index && editing.col === col"
@@ -497,7 +657,7 @@ onMounted(async () => {
                   @blur="commitEdit(row)"
                   @click.stop
                 />
-                <template v-else>{{ cellText(row, col) }}</template>
+                <template v-else>{{ stagedCellText(row, index, col) }}</template>
               </td>
             </tr>
 
@@ -556,12 +716,28 @@ onMounted(async () => {
             :title="`点击复制 ${col}`"
             @click="copyCell(selectedRow, col)"
           >
-            <span class="rd-key">{{ col }}</span>
+            <span class="rd-key">
+              {{ col }}
+              <span v-if="colType(col)" class="rd-type">{{ colType(col) }}</span>
+            </span>
             <span class="rd-val" :class="{ 'is-null': isNull(selectedRow, col) }">
               {{ cellText(selectedRow, col) }}
             </span>
           </button>
         </div>
+      </div>
+
+      <!-- 暂存操作条：有未提交修改时出现（TablePlus 式批量提交/放弃） -->
+      <div v-if="props.editable && stagedCount > 0" class="staged-bar">
+        <span class="staged-tip">
+          <span class="staged-dot" aria-hidden="true"></span>
+          {{ stagedCount }} 处修改未提交（编辑已暂存，尚未写入数据库）
+        </span>
+        <button class="ghost" type="button" @click="discardStaged">放弃</button>
+        <button class="primary" type="button" @click="commitStaged">
+          <BaseIcon name="check" :size="14" />
+          <span>提交全部</span>
+        </button>
       </div>
 
       <!-- 新增行操作条：填了内容才高亮可点 -->

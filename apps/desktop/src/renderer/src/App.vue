@@ -2,11 +2,8 @@
 /**
  * App — 应用外壳
  *
- * P1 变更：
- * 1. 执行入口换成统一信封接口（execute），支持"需确认"分支 → 弹 ConfirmDialog
- * 2. 顶栏新增只读模式开关：给"只想看数据"或"让 AI 自由探索"的场景兜底
- * 3. 新增 AI 助手抽屉与 AI 配置面板；AI 生成的 SQL 与手写 SQL 走同一条护栏
- * 4. 写语句的结果用「影响 N 行」表达，而不是"返回 0 行"
+ * 主区为标签工作台（Workbench）：查询 / 数据:表 / 设计:表 三类标签可多开。
+ * 执行逻辑集中在 useWorkbench 状态机；危险 SQL 与 AI 解释通过 handler 上抛到本组件的弹窗。
  */
 import { computed, onMounted, reactive, ref } from 'vue';
 import ConnectionForm from './components/ConnectionForm.vue';
@@ -60,8 +57,6 @@ const pendingTab = ref<WorkbenchTab | null>(null);
 const aiOpen = ref(false);
 const aiSettingsOpen = ref(false);
 
-/** 可视化建表（已迁至主区「设计表」标签页；保留旧 Modal 入口，未使用） */
-
 /** AI 解释弹窗 */
 const infoOpen = ref(false);
 const infoTitle = ref('');
@@ -95,10 +90,8 @@ const deleteConfirm = reactive<{ open: boolean; id: string; name: string }>({
   name: '',
 });
 
-/** 当前打开的数据网格：表名 + 主键列（用于双击单元格编辑 → 生成 UPDATE） */
-const activeTable = ref<{ name: string; pkColumns: string[] } | null>(null);
-/** 打开数据网格时执行的 SELECT，UPDATE 成功后重跑它刷新 */
-const activeTableSql = ref('');
+/** 顶栏「执行」按钮的进行中态 = 当前激活标签的执行中 */
+const running = computed(() => wb.activeTab.value?.running ?? false);
 
 /** 各数据库类型的徽标与颜色（列表里一眼识别类型） */
 const TYPE_BADGE: Record<string, { label: string; color: string }> = {
@@ -133,7 +126,7 @@ const dbType = computed(() => (currentConnection.value?.type as 'sqlite' | 'mysq
 /** 当前连接是否已建立（供工作台判断建表/写入是否可写） */
 const connected = computed(() => Boolean(currentConnection.value?.active));
 
-// 把连接上下文绑定给工作台状态机；危险确认与解释弹窗上抛到 App 的对话框
+// 把连接上下文绑定给工作台状态机；危险确认与解释弹窗上抛到本组件
 wb.bindConnection(activeId, dbType, connected);
 wb.onNeedConfirm((tab, sqlText, analysis) => {
   pendingTab.value = tab;
@@ -186,7 +179,7 @@ async function refresh(): Promise<void> {
 }
 
 /**
- * 选中连接（切换连接时清空结果，避免上一个库的结果被误看成当前库）。
+ * 选中连接（标签保留，工作台按当前连接执行）。
  * @param id 连接 id
  */
 function selectConnection(id: string): void {
@@ -209,7 +202,7 @@ function onConnClick(item: ConnectionItem): void {
 /** 正在连接的连接 id（连点同一张卡不会重复发起连接；不需要触发重渲染，故用普通 Set） */
 const connectingIds = new Set<string>();
 
-/** 用已保存配置重连（复用原 id） */
+/** 用已保存配置重连（复用原 id）；成功后保底开一个查询标签 */
 async function connectExisting(id: string): Promise<void> {
   if (connectingIds.has(id)) return;
   connectingIds.add(id);
@@ -294,8 +287,6 @@ async function doDelete(): Promise<void> {
     await window.kuxi.deleteConnection(deleteConfirm.id);
     if (activeId.value === deleteConfirm.id) {
       activeId.value = '';
-      result.value = null;
-      error.value = '';
     }
     toast.success(`已删除连接「${deleteConfirm.name}」`);
     deleteConfirm.open = false;
@@ -427,6 +418,186 @@ async function createDemo(): Promise<void> {
   }
 }
 
+/**
+ * 切换只读模式（写策略在主进程，这里只发指令并同步 UI）。
+ */
+async function toggleReadOnly(): Promise<void> {
+  const next = !readOnly.value;
+  try {
+    const settings = await window.kuxi.setSettings({ readOnly: next });
+    readOnly.value = settings.readOnly;
+    toast.info(next ? '已开启只读模式：所有写操作会被拒绝' : '已关闭只读模式：可以执行增删改');
+  } catch (e) {
+    toast.error(`切换失败：${(e as Error).message}`);
+  }
+}
+
+/**
+ * 断开指定连接。
+ * @param id 连接 id
+ */
+async function disconnect(id: string): Promise<void> {
+  if (disconnectingId.value) {
+    return;
+  }
+  const target = connections.value.find((item) => item.id === id);
+  disconnectingId.value = id;
+  try {
+    await window.kuxi.disconnect(id);
+    toast.info(`已断开${target ? `「${target.name}」` : '连接'}`);
+    await refresh();
+  } catch (e) {
+    toast.error(`断开失败：${(e as Error).message}`);
+  } finally {
+    disconnectingId.value = '';
+  }
+}
+
+/**
+ * 让连接卡片支持键盘操作（Enter / Space 选中/连接）。
+ * @param event 键盘事件
+ * @param item 连接项
+ */
+function onCardKeydown(event: KeyboardEvent, item: ConnectionItem): void {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    onConnClick(item);
+  }
+}
+
+/** 把外部生成的 SQL（AI 结果 / 点表名）填入查询标签，不自动执行 */
+function applySql(text: string): void {
+  wb.applyToActiveQuery(text);
+  toast.success('已填入编辑器，确认后再执行');
+}
+
+/** AI 面板「执行」：填入查询标签并立即执行 */
+function runAi(text: string): void {
+  wb.applyToActiveQuery(text);
+  wb.runActive();
+}
+
+/** 表结构右键「删除表」：开一个查询标签放 DROP 并执行（会触发危险确认） */
+function onDropTable(table: string): void {
+  const ident = dbType.value === 'mysql' ? `\`${table}\`` : `"${table}"`;
+  const dropSql = `DROP TABLE ${ident};`;
+  const tab = wb.openQuery(dropSql);
+  void wb.run(tab, dropSql);
+}
+
+/** 确认弹窗：用户点了确认 → 回到触发确认的标签执行 */
+function onConfirmExecute(): void {
+  confirmOpen.value = false;
+  if (pendingTab.value) {
+    void wb.run(pendingTab.value, pendingSql.value, true);
+  }
+  pendingTab.value = null;
+}
+
+/** 确认弹窗：取消执行 */
+function onCancelExecute(): void {
+  confirmOpen.value = false;
+  pendingAnalysis.value = null;
+  pendingTab.value = null;
+  toast.info('已取消执行');
+}
+
+onMounted(async () => {
+  void refresh();
+  try {
+    const settings = await window.kuxi.getSettings();
+    readOnly.value = settings.readOnly;
+    encryptionAvailable.value = settings.encryptionAvailable;
+    sortMode.value = settings.connectionSort ?? 'default';
+  } catch {
+    /* 设置读取失败不阻塞使用，保持默认 */
+  }
+  // 预取 AI 配置，让 AI 面板一打开就知道是否需要引导配置
+  await refreshAiConfig();
+});
+</script>
+
+<template>
+  <div class="app">
+    <!-- 顶部工具栏：品牌 / 当前连接 / 只读开关 / AI / 外观设置 / 执行 -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><BaseIcon name="logo" :size="18" /></span>
+        <span>库犀</span>
+        <span class="brand-sub">用大白话问数据库</span>
+      </div>
+
+      <span class="conn-chip" :title="currentLabel">
+        <span class="conn-dot" :class="{ on: currentConnection?.active }" aria-hidden="true"></span>
+        <span>当前连接：</span>
+        <strong>{{ currentLabel }}</strong>
+      </span>
+
+      <div class="topbar-actions">
+        <button
+          class="ghost icon-lead"
+          :class="{ 'is-on': readOnly }"
+          type="button"
+          :aria-pressed="readOnly"
+          :title="readOnly ? '只读模式：写操作会被拒绝（点击关闭）' : '可写模式：允许增删改（点击开启只读）'"
+          @click="toggleReadOnly"
+        >
+          <BaseIcon :name="readOnly ? 'lock' : 'unlock'" :size="15" />
+          <span>{{ readOnly ? '只读' : '可写' }}</span>
+        </button>
+        <button
+          class="ghost icon-lead"
+          :class="{ 'is-on': aiOpen }"
+          type="button"
+          :aria-pressed="aiOpen"
+          title="AI 助手：用中文生成 SQL"
+          @click="aiOpen = !aiOpen"
+        >
+          <BaseIcon name="sparkles" :size="15" />
+          <span>AI</span>
+        </button>
+        <ThemeSwitcher />
+        <button
+          class="primary"
+          type="button"
+          :disabled="running"
+          :title="activeId ? '执行当前标签页' : '请先选择连接'"
+          @click="wb.runActive()"
+        >
+          <span v-if="running" class="spinner" aria-hidden="true"></span>
+          <BaseIcon v-else name="play" :size="13" />
+          <span>{{ running ? '执行中…' : '执行' }}</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <h2>
+            <span>连接</span>
+            <span class="count">{{ connections.length }}</span>
+          </h2>
+          <div class="sidebar-head-actions">
+            <button
+              class="icon-btn"
+              type="button"
+              :title="`排序：${sortMode === 'default' ? '默认' : sortMode === 'name' ? '按名称' : '按类型'}`"
+              :aria-label="`排序：${sortMode === 'default' ? '默认' : sortMode === 'name' ? '按名称' : '按类型'}`"
+              @click="cycleSort"
+            >
+              <BaseIcon name="sort" :size="15" />
+            </button>
+            <button
+              class="icon-btn"
+              type="button"
+              title="从链接导入"
+              aria-label="从链接导入"
+              @click="openUrlImport"
+            >
+              <BaseIcon name="link" :size="15" />
+            </button>
+            <button
               class="icon-btn"
               type="button"
               title="导入连接"
@@ -441,6 +612,59 @@ async function createDemo(): Promise<void> {
               type="button"
               title="导出连接"
               aria-label="导出连接"
+              :disabled="fileBusy"
+              @click="onExport"
+            >
+              <BaseIcon name="download" :size="15" />
+            </button>
+            <button class="add-conn" type="button" title="新建连接" @click="openCreate">
+              <BaseIcon name="plus" :size="14" />
+              <span>新建连接</span>
+            </button>
+          </div>
+        </div>
+
+        <input
+          v-model="searchKeyword"
+          class="conn-search"
+          type="search"
+          placeholder="搜索连接…"
+          aria-label="搜索连接"
+        />
+
+        <div class="conn-list">
+          <div
+            v-for="item in filteredConnections"
+            :key="item.id"
+            class="conn-item"
+            :class="{ active: item.id === activeId }"
+            role="button"
+            tabindex="0"
+            :aria-pressed="item.id === activeId"
+            :aria-label="`${item.active ? '选择' : '连接'} ${item.name}`"
+            @click="onConnClick(item)"
+            @keydown="onCardKeydown($event, item)"
+            @contextmenu="onConnContextMenu($event, item)"
+          >
+            <span class="type-badge" :style="{ background: typeBadge(item.type).color }" aria-hidden="true">
+              <BaseIcon name="database" :size="14" />
+            </span>
+            <div class="conn-body">
+              <div class="conn-name">{{ item.name }}</div>
+              <div class="conn-sub">
+                {{ item.type }}
+                <template v-if="item.type === 'sqlite'"> · {{ item.filename || ':memory:' }}</template>
+                <template v-else> · {{ item.host }}:{{ item.port }}</template>
+              </div>
+            </div>
+            <span class="conn-dot" :class="{ on: item.active }" :title="item.active ? '已连接' : '未连接'" aria-hidden="true"></span>
+          </div>
+
+          <div v-if="!connections.length" class="empty-card">
+            <strong>还没有任何连接</strong>
+            <p class="empty-hint">点右上角「＋ 新建连接」添加第一个，保存后即可开始查询。</p>
+            <button
+              class="primary demo-btn"
               type="button"
               :disabled="demoBusy"
               @click="createDemo"
@@ -460,36 +684,18 @@ async function createDemo(): Promise<void> {
           :connection-id="activeId"
           :connected="Boolean(currentConnection?.active)"
           :db-type="currentConnection?.type || ''"
-          :refresh-token="schemaRefreshToken"
+          :refresh-token="wb.schemaRefreshToken.value"
           @pick="applySql"
-          @open="openTableData"
-          @create="tableDesignerOpen = true"
+          @open="(table: string, pk: string[]) => wb.openData(table, pk)"
+          @create="() => wb.openDesign()"
+          @design="(table: string) => wb.openDesign(table)"
           @drop="onDropTable"
         />
       </aside>
 
+      <!-- 主区：标签工作台（查询 / 数据 / 设计） -->
       <main class="main">
-        <MonacoEditor
-          v-model="sql"
-          :running="running"
-          :ai-ready="aiReady"
-          @execute="run"
-          @execute-selection="runText"
-          @format="onFormat"
-          @optimize="onOptimize"
-          @explain="onExplain"
-        />
-        <ResultTable
-          :result="result"
-          :loading="running"
-          :error="error"
-          :editable="Boolean(activeTable)"
-          :table-name="activeTable?.name || ''"
-          :pk-columns="activeTable?.pkColumns || []"
-          :inserting="insertBusy"
-          @update-cell="onUpdateCell"
-          @insert-row="onInsertRow"
-        />
+        <Workbench />
       </main>
 
       <!-- AI 助手抽屉 -->
@@ -517,16 +723,6 @@ async function createDemo(): Promise<void> {
 
     <!-- AI 配置 -->
     <AiSettings :open="aiSettingsOpen" @close="aiSettingsOpen = false" />
-
-    <!-- 可视化建表 -->
-    <TableDesigner
-      :open="tableDesignerOpen"
-      :db-type="dbType"
-      :connected="Boolean(currentConnection?.active)"
-      :connection-id="activeId"
-      @close="tableDesignerOpen = false"
-      @created="schemaRefreshToken++"
-    />
 
     <!-- AI 解释结果 -->
     <InfoDialog :open="infoOpen" :title="infoTitle" :content="infoContent" @close="infoOpen = false" />

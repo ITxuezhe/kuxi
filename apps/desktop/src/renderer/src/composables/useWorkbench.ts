@@ -15,7 +15,13 @@
  */
 import { computed, ref, type Ref } from 'vue';
 import type { DbType, QueryResult, SqlAnalysis } from '@kuxi/shared';
-import { generateInsert, generateUpdate } from '../utils/sql';
+import {
+  applySortToSql,
+  generateDelete,
+  generateInsert,
+  generateUpdate,
+  stripSqlOrder,
+} from '../utils/sql';
 import { buildSchemaText, dialectOf, explainSql, optimizeSql } from '../composables/useAi';
 import { formatSql } from '../utils/sql';
 import { useToast } from '../composables/useToast';
@@ -93,10 +99,15 @@ function makeTab(init: Partial<WorkbenchTab> & { kind: TabKind; title: string })
 }
 
 /** 统一执行入口：设置当前标签的结果态，confirm 上抛给 App 弹窗 */
-async function run(tab: WorkbenchTab, sql: string, confirmed = false): Promise<void> {
+async function run(
+  tab: WorkbenchTab,
+  sql: string,
+  confirmed = false,
+  silent = false,
+): Promise<void> {
   if (!connIdRef?.value) {
     tab.error = '请先选择或新建一个连接';
-    toast.error('请先选择或新建一个连接');
+    if (!silent) toast.error('请先选择或新建一个连接');
     return;
   }
   tab.running = true;
@@ -108,20 +119,24 @@ async function run(tab: WorkbenchTab, sql: string, confirmed = false): Promise<v
       const r = outcome.result;
       tab.result = r;
       if (r && typeof r.affectedRows === 'number' && r.affectedRows >= 0 && r.kind !== 'read') {
-        toast.success(`执行成功：影响 ${r.affectedRows} 行，耗时 ${r.tookMs}ms`);
-      } else if (r) {
+        if (!silent) {
+          toast.success(`执行成功：影响 ${r.affectedRows} 行，耗时 ${r.tookMs}ms`);
+        }
+        // 数据标签的写操作成功后自动重跑网格 SQL 刷新（覆盖确认弹窗后不刷新的路径）
+        if (tab.kind === 'data') void run(tab, tab.gridSql, false, true);
+      } else if (r && !silent) {
         toast.success(`查询完成：${r.rowCount} 行，耗时 ${r.tookMs}ms`);
       }
     } else if (outcome.status === 'confirm') {
       confirmHandler?.(tab, outcome.sql, outcome.analysis ?? null);
     } else {
       tab.error = outcome.message;
-      toast.error(outcome.message);
+      if (!silent) toast.error(outcome.message);
     }
   } catch (e) {
     const message = (e as Error).message;
     tab.error = message;
-    toast.error(`执行失败：${message}`);
+    if (!silent) toast.error(`执行失败：${message}`);
   } finally {
     tab.running = false;
   }
@@ -299,7 +314,13 @@ export function useWorkbench() {
 
   async function updateCell(
     tab: WorkbenchTab,
-    payload: { column: string; newValue: string; oldValue: unknown; pkValue: unknown },
+    payload: {
+      column: string;
+      newValue: string;
+      oldValue: unknown;
+      pkValue: unknown;
+      setNull?: boolean;
+    },
   ): Promise<void> {
     if (!tab.pkColumns.length) return;
     const pkCol = tab.pkColumns[0];
@@ -311,8 +332,87 @@ export function useWorkbench() {
       payload.column,
       payload.newValue,
       payload.oldValue,
+      payload.setNull ?? false,
     );
     await execAndRefresh(tab, sql);
+  }
+
+  /** 删除行：主键定位单行；DELETE 走确认弹窗，确认执行后 run() 会自动刷新网格 */
+  function deleteRow(tab: WorkbenchTab, pkValue: unknown): void {
+    if (!tab.pkColumns.length) {
+      toast.error('该表没有主键，无法定位行删除');
+      return;
+    }
+    const sql = generateDelete(currentDbType.value, tab.table, tab.pkColumns[0], pkValue);
+    confirmHandler?.(tab, sql, null);
+  }
+
+  /**
+   * 批量提交暂存的单元格修改（TablePlus 式）：逐条生成 UPDATE 顺序执行。
+   * 失败即停、不刷新结果（网格上的暂存高亮保留，用户可改后重试）；
+   * 全部成功后重跑网格 SQL，结果刷新会自然清空暂存。
+   */
+  async function commitStaged(
+    tab: WorkbenchTab,
+    changes: Array<{
+      col: string;
+      oldValue: unknown;
+      newValue: string;
+      setNull: boolean;
+      pkValue: unknown;
+    }>,
+  ): Promise<void> {
+    if (!connIdRef?.value) {
+      toast.error('请先选择或新建一个连接');
+      return;
+    }
+    if (!tab.pkColumns.length) {
+      toast.error('该表没有主键，无法提交修改');
+      return;
+    }
+    const pkCol = tab.pkColumns[0];
+    let done = 0;
+    for (const ch of changes) {
+      const sql = generateUpdate(
+        currentDbType.value,
+        tab.table,
+        pkCol,
+        ch.pkValue,
+        ch.col,
+        ch.newValue,
+        ch.oldValue,
+        ch.setNull,
+      );
+      try {
+        const outcome = await window.kuxi.execute(connIdRef.value, sql, false);
+        if (outcome.status !== 'ok') {
+          toast.error(`第 ${done + 1} 处修改失败：${outcome.message}（其余修改仍在暂存区）`);
+          return;
+        }
+        done += 1;
+      } catch (e) {
+        toast.error(`提交失败：${(e as Error).message}（其余修改仍在暂存区）`);
+        return;
+      }
+    }
+    toast.success(`已提交 ${done} 处修改`);
+    await run(tab, tab.gridSql, false, true);
+  }
+
+  /** 列头排序：重组网格 SQL（剥旧 ORDER BY → 加新 ORDER BY → 保留 LIMIT）并重跑 */
+  function sortGrid(
+    tab: WorkbenchTab,
+    column: string,
+    dir: 'asc' | 'desc' | '',
+  ): void {
+    if (!dir) {
+      // 取消排序：还原为无 ORDER BY 的基础网格 SQL（保留 LIMIT）
+      tab.gridSql = stripSqlOrder(tab.gridSql);
+      void run(tab, tab.gridSql);
+      return;
+    }
+    tab.gridSql = applySortToSql(tab.gridSql, column, dir, currentDbType.value);
+    void run(tab, tab.gridSql);
   }
 
   async function insertRow(
@@ -428,6 +528,9 @@ export function useWorkbench() {
     bumpSchema,
     updateCell,
     insertRow,
+    deleteRow,
+    commitStaged,
+    sortGrid,
     createTable,
     format,
     optimize,
