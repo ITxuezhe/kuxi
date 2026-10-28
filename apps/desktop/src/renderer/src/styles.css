@@ -850,6 +850,57 @@ th.sortable:hover {
   font-size: 9px;
   color: var(--primary);
 }
+
+/* 列头右侧拖拽手柄：绝对定位于 th 右缘（th 已是 sticky 定位上下文） */
+.col-head {
+  position: relative;
+}
+.col-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 4;
+  background: transparent;
+}
+.col-resize:hover {
+  background: var(--primary);
+  opacity: 0.5;
+}
+
+/* 冻结第一数据列：横向滚动时常驻（行号列由 .row-num 已 sticky） */
+th.col-frozen,
+td.col-frozen {
+  position: sticky;
+  left: 44px;
+  z-index: 1;
+  background: var(--panel);
+}
+th.col-frozen {
+  z-index: 3;
+  background: var(--panel-2);
+}
+tbody tr:hover td.col-frozen {
+  background: var(--primary-soft);
+}
+
+/* 冻结首列开关（meta 内） */
+.freeze-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.freeze-toggle.is-on {
+  border-color: var(--primary);
+  color: var(--text);
+}
+.freeze-toggle.is-on .base-icon {
+  color: var(--primary);
+}
+
 /* 暂存修改的单元格：琥珀色提醒（未写入数据库） */
 td.cell-staged {
   background: var(--warn-soft);
@@ -2168,7 +2219,7 @@ button.danger:hover:not(:disabled) {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
@@ -2182,6 +2233,94 @@ button.danger:hover:not(:disabled) {
   color: var(--text);
   font-size: var(--font-sm);
   font-weight: 600;
+}
+
+/* 网格撑满主区，分页栏固定底部 */
+.data-grid {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 0;
+}
+
+/* 数据标签底部分页栏 */
+.data-pager {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+.pager-info {
+  min-width: 64px;
+  text-align: center;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.pager-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 4px;
+}
+.pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pager-size select {
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 0 6px;
+}
+
+/* 数据网格过滤框：靠右，纯前端过滤当前结果 */
+.filter-box {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.filter-box:focus-within {
+  border-color: var(--primary);
+  color: var(--text);
+}
+.filter-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--font-sm);
+  width: 220px;
+}
+.filter-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+.filter-clear:hover {
+  color: var(--text);
+  background: var(--panel-3);
 }
 
 .design-tab {
@@ -2204,6 +2343,10 @@ button.danger:hover:not(:disabled) {
   margin-top: 4px;
   color: var(--muted);
   font-size: var(--font-sm);
+}
+
+.designer-hint.warn-hint {
+  color: var(--warn);
 }
 
 .designer-actions {

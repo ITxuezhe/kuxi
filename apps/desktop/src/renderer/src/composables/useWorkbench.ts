@@ -16,6 +16,7 @@
 import { computed, ref, type Ref } from 'vue';
 import type { DbType, QueryResult, SqlAnalysis } from '@kuxi/shared';
 import {
+  applyPagingToSql,
   applySortToSql,
   generateDelete,
   generateInsert,
@@ -38,6 +39,10 @@ export interface WorkbenchTab {
   table: string;
   pkColumns: string[];
   gridSql: string;
+  /** 分页：每页行数（数据标签，0 视为不分页） */
+  pageSize: number;
+  /** 分页：当前偏移（数据标签） */
+  pageOffset: number;
   /** design：要设计的表名（undefined = 新建表） */
   designTable?: string;
   /** 运行时状态（每个标签独立） */
@@ -86,6 +91,8 @@ function makeTab(init: Partial<WorkbenchTab> & { kind: TabKind; title: string })
     table: '',
     pkColumns: [],
     gridSql: '',
+    pageSize: 100,
+    pageOffset: 0,
     designTable: undefined,
     result: null,
     error: '',
@@ -399,19 +406,37 @@ export function useWorkbench() {
     await run(tab, tab.gridSql, false, true);
   }
 
-  /** 列头排序：重组网格 SQL（剥旧 ORDER BY → 加新 ORDER BY → 保留 LIMIT）并重跑 */
+  /** 列头排序：重组网格 SQL（剥旧 ORDER BY → 加新 ORDER BY）并重跑；排序后回到第 1 页 */
   function sortGrid(
     tab: WorkbenchTab,
     column: string,
     dir: 'asc' | 'desc' | '',
   ): void {
+    tab.pageOffset = 0;
     if (!dir) {
-      // 取消排序：还原为无 ORDER BY 的基础网格 SQL（保留 LIMIT）
-      tab.gridSql = stripSqlOrder(tab.gridSql);
+      // 取消排序：还原为基础网格 SQL（保留 LIMIT）后套用分页
+      tab.gridSql = applyPagingToSql(stripSqlOrder(tab.gridSql), tab.pageSize, 0);
       void run(tab, tab.gridSql);
       return;
     }
-    tab.gridSql = applySortToSql(tab.gridSql, column, dir, currentDbType.value);
+    const ordered = applySortToSql(tab.gridSql, column, dir, currentDbType.value);
+    tab.gridSql = applyPagingToSql(ordered, tab.pageSize, 0);
+    void run(tab, tab.gridSql);
+  }
+
+  /** 分页导航：跳到指定偏移并重跑网格（保留当前排序） */
+  function setPage(tab: WorkbenchTab, offset: number): void {
+    if (offset < 0) offset = 0;
+    tab.pageOffset = offset;
+    tab.gridSql = applyPagingToSql(tab.gridSql, tab.pageSize, offset);
+    void run(tab, tab.gridSql);
+  }
+
+  /** 切换每页行数：复位到第 1 页并重跑 */
+  function setPageSize(tab: WorkbenchTab, size: number): void {
+    tab.pageSize = size;
+    tab.pageOffset = 0;
+    tab.gridSql = applyPagingToSql(tab.gridSql, size, 0);
     void run(tab, tab.gridSql);
   }
 
@@ -531,6 +556,8 @@ export function useWorkbench() {
     deleteRow,
     commitStaged,
     sortGrid,
+    setPage,
+    setPageSize,
     createTable,
     format,
     optimize,

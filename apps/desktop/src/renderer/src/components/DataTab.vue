@@ -4,7 +4,7 @@
  * 可编辑、可新增行；更新/新增走 useWorkbench（执行后自动重跑网格刷新）。
  * 列头类型标注来自 getSchema（Navicat 式列名下灰色小字 + PK 徽标）。
  */
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import ResultTable from './ResultTable.vue';
 import { useWorkbench, type WorkbenchTab } from '../composables/useWorkbench';
 import BaseIcon from './BaseIcon.vue';
@@ -14,6 +14,15 @@ const wb = useWorkbench();
 
 /** 列名 → 类型（INTEGER / TEXT / varchar(255)…），取不到时为空对象（列头就不显示类型） */
 const columnTypes = ref<Record<string, string>>({});
+
+/** 网格过滤框（纯前端过滤当前结果，不影响 SQL） */
+const filterText = ref('');
+
+/** 当前页码（1 基）与是否还有下一页（拿满一整页即视为可能有下一页） */
+const currentPage = computed<number>(() =>
+  props.tab.pageSize > 0 ? Math.floor(props.tab.pageOffset / props.tab.pageSize) + 1 : 1,
+);
+const hasNext = computed<boolean>(() => (props.tab.result?.rows.length ?? 0) >= props.tab.pageSize);
 
 async function loadColumnTypes(): Promise<void> {
   columnTypes.value = {};
@@ -64,6 +73,36 @@ function onSort(col: string, next: 'asc' | 'desc' | ''): void {
         <BaseIcon name="refresh" :size="14" />
         <span>刷新</span>
       </button>
+      <button
+        class="ghost icon-lead"
+        type="button"
+        :disabled="tab.running"
+        title="修改该表结构（字段类型、增删列）"
+        @click="wb.openDesign(tab.table)"
+      >
+        <BaseIcon name="edit" :size="14" />
+        <span>设计此表</span>
+      </button>
+      <span class="filter-box">
+        <BaseIcon name="search" :size="13" />
+        <input
+          v-model="filterText"
+          class="filter-input"
+          type="text"
+          placeholder="过滤当前结果（任一列包含即匹配）"
+          :aria-label="`过滤 ${tab.table} 的数据`"
+        />
+        <button
+          v-if="filterText"
+          class="filter-clear"
+          type="button"
+          title="清除过滤"
+          aria-label="清除过滤"
+          @click="filterText = ''"
+        >
+          <BaseIcon name="close" :size="12" />
+        </button>
+      </span>
     </div>
     <ResultTable
       class="data-grid"
@@ -74,6 +113,8 @@ function onSort(col: string, next: 'asc' | 'desc' | ''): void {
       :table-name="tab.table"
       :pk-columns="tab.pkColumns"
       :column-types="columnTypes"
+      :dialect="wb.currentDbType.value"
+      :filter-text="filterText"
       :sortable="true"
       :sort-state="sortState"
       :inserting="tab.insertBusy"
@@ -83,5 +124,50 @@ function onSort(col: string, next: 'asc' | 'desc' | ''): void {
       @commit-changes="(changes: any) => wb.commitStaged(tab, changes)"
       @sort="(col: string, next: 'asc' | 'desc' | '') => onSort(col, next)"
     />
+    <div v-if="tab.result" class="data-pager">
+      <button
+        class="ghost"
+        type="button"
+        :disabled="tab.running || currentPage <= 1"
+        title="回到第 1 页"
+        @click="wb.setPage(tab, 0)"
+      >
+        首页
+      </button>
+      <button
+        class="ghost"
+        type="button"
+        :disabled="tab.running || currentPage <= 1"
+        title="上一页"
+        @click="wb.setPage(tab, tab.pageOffset - tab.pageSize)"
+      >
+        上一页
+      </button>
+      <span class="pager-info">第 {{ currentPage }} 页</span>
+      <button
+        class="ghost"
+        type="button"
+        :disabled="tab.running || !hasNext"
+        title="下一页"
+        @click="wb.setPage(tab, tab.pageOffset + tab.pageSize)"
+      >
+        下一页
+      </button>
+      <span class="pager-sep"></span>
+      <label class="pager-size">
+        每页
+        <select
+          :value="tab.pageSize"
+          :disabled="tab.running"
+          @change="wb.setPageSize(tab, Number(($event.target as HTMLSelectElement).value))"
+        >
+          <option :value="50">50</option>
+          <option :value="100">100</option>
+          <option :value="200">200</option>
+          <option :value="500">500</option>
+        </select>
+        行
+      </label>
+    </div>
   </div>
 </template>

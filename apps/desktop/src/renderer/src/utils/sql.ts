@@ -7,7 +7,7 @@
  */
 
 import { format } from 'sql-formatter';
-import type { DbType } from '@kuxi/shared';
+import type { ColumnInfo, DbType } from '@kuxi/shared';
 
 /** 各方言常用类型（建表设计器下拉 + 自增等默认值） */
 export const TYPE_OPTIONS: Record<DbType, string[]> = {
@@ -268,6 +268,56 @@ export function generateDelete(
 }
 
 /**
+ * 把一整行数据生成 INSERT 语句（"复制为 INSERT"用）。
+ * 写入该行所有列，值经 quoteValue 序列化（NULL→NULL、数字→数字、布尔按方言、其余→单引号转义）。
+ *
+ * @param dialect 方言
+ * @param table 表名
+ * @param row 行数据（列名 → 值）
+ * @param columns 列顺序（通常取查询结果列序）
+ */
+export function generateRowInsert(
+  dialect: DbType,
+  table: string,
+  row: Record<string, unknown>,
+  columns: string[],
+): string {
+  const cols = columns.filter((c) => c in row);
+  if (!cols.length) throw new Error('没有可写入的列');
+  const columnsSql = cols.map((c) => quoteIdent(dialect, c)).join(', ');
+  const valuesSql = cols.map((c) => quoteValue(row[c], dialect)).join(', ');
+  return `INSERT INTO ${quoteIdent(dialect, table)} (${columnsSql}) VALUES (${valuesSql});`;
+}
+
+/**
+ * 把一整行数据生成 UPDATE 语句（"复制为 UPDATE"用）。
+ * SET 所有非主键列（值经 quoteValue 序列化），WHERE 用全部主键列定位该行。
+ *
+ * @param dialect 方言
+ * @param table 表名
+ * @param row 行数据（列名 → 值，须含主键列）
+ * @param pkColumns 主键列（可复合）
+ * @param columns 列顺序（通常取查询结果列序）
+ */
+export function generateRowUpdate(
+  dialect: DbType,
+  table: string,
+  row: Record<string, unknown>,
+  pkColumns: string[],
+  columns: string[],
+): string {
+  const setCols = columns.filter((c) => !pkColumns.includes(c) && c in row);
+  const setSql = setCols
+    .map((c) => `${quoteIdent(dialect, c)} = ${quoteValue(row[c], dialect)}`)
+    .join(', ');
+  const whereClauses = pkColumns
+    .filter((c) => c in row)
+    .map((c) => `${quoteIdent(dialect, c)} = ${quoteValue(row[c], dialect)}`);
+  const whereSql = whereClauses.length ? whereClauses.join(' AND ') : '1=0';
+  return `UPDATE ${quoteIdent(dialect, table)} SET ${setSql} WHERE ${whereSql};`;
+}
+
+/**
  * 剥掉网格 SQL 里的排序与分页尾巴，还原成干净的主体（含 LIMIT 时保留）。
  * 仅针对本应用生成的网格 SQL（SELECT ... FROM t [WHERE ...] [ORDER BY ...] LIMIT n），
  * 不做通用 SQL 解析；字符串字面量里恰好含 "ORDER BY" 的极端情况不支持。
@@ -312,4 +362,81 @@ export function applySortToSql(
     `${body} ORDER BY ${quoteIdent(dialect, column)} ${dir === 'desc' ? 'DESC' : 'ASC'}` +
     `${limitSql ? ` ${limitSql}` : ''};`
   );
+}
+
+/**
+ * 给网格 SQL 应用分页：替换末尾的 `LIMIT ... [OFFSET ...]`（保留 ORDER BY 与 SELECT 主体），
+ * 用于数据标签的服务端分页导航。排序与分页互不破坏：排序后由调用方把偏移重置为 0 再套用本函数。
+ *
+ * @param sql 当前网格 SQL（可能含 ORDER BY + LIMIT）
+ * @param pageSize 每页行数
+ * @param offset 偏移（从 0 开始）
+ */
+export function applyPagingToSql(sql: string, pageSize: number, offset: number): string {
+  const body = sql
+    .trim()
+    .replace(/;\s*$/, '')
+    .replace(/\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$/i, '')
+    .trim();
+  return `${body} LIMIT ${pageSize} OFFSET ${offset};`;
+}
+
+/**
+ * 把内核返回的列信息（ColumnInfo）映射为建表字段定义（FieldDef）。
+ * 用于「编辑已有表」时预填设计表单。
+ * 说明：自增（AUTOINCREMENT / SERIAL）无法从 schema 可靠还原，这里置 false，
+ * 重建后的表以表单当前定义为准（会在确认弹窗告知用户约束可能变化）。
+ */
+export function columnsToFields(cols: ColumnInfo[]): FieldDef[] {
+  return cols.map((c) => {
+    const m = /^([A-Za-z0-9_ ]+?)\s*\(([^)]+)\)$/.exec(c.type.trim());
+    return {
+      name: c.name,
+      type: m ? m[1].trim() : c.type.trim(),
+      length: m ? m[2].trim() : '',
+      primaryKey: c.primaryKey,
+      notNull: !c.nullable,
+      autoIncrement: false,
+      defaultValue: c.defaultValue ?? '',
+    };
+  });
+}
+
+/**
+ * 生成「重建表」执行计划（用于修改字段类型 / 增删列）。
+ *
+ * SQLite 不支持原地 ALTER COLUMN TYPE，所有方言统一走重建表流程：
+ *   1. 用新 schema 建临时表（带随机后缀，避免上次残留冲突）
+ *   2. 从原表按列名 1:1 拷贝数据
+ *   3. 删除原表（危险操作，UI 需二次确认）
+ *   4. 临时表改名为原表名
+ *
+ * 编辑模式下列名锁定（不重命名），故 SELECT 按列名对应即可。
+ */
+export interface RebuildPlan {
+  /** 有序单语句步骤，逐条 execute */
+  steps: string[];
+  /** 临时表名（调试 / 清理用） */
+  tempTable: string;
+}
+
+export function generateRebuildPlan(
+  dialect: DbType,
+  table: string,
+  newFields: FieldDef[],
+  oldColumns: string[] = [],
+): RebuildPlan {
+  const tempTable = `${table}__kuxi_tmp_${Date.now().toString(36)}`;
+  const t = ident(dialect, table);
+  const tmp = ident(dialect, tempTable);
+  const create = generateCreateTable(dialect, tempTable, newFields);
+  // 仅拷贝「新旧表都有的列」：新增列由表定义给默认值，删除的列自然丢弃
+  const retained = newFields.filter((f) => oldColumns.includes(f.name));
+  const cols = retained.map((f) => ident(dialect, f.name));
+  const insert = cols.length
+    ? `INSERT INTO ${tmp} (${cols.join(', ')}) SELECT ${cols.join(', ')} FROM ${t};`
+    : '';
+  const drop = `DROP TABLE ${t};`;
+  const rename = `ALTER TABLE ${tmp} RENAME TO ${t};`;
+  return { steps: [create, insert, drop, rename], tempTable };
 }

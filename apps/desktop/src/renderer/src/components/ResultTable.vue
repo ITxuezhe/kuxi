@@ -15,10 +15,11 @@
  * - 双击单元格改单格，右键复制/导出
  */
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import type { ExporterInfo, QueryResult } from '@kuxi/shared';
+import type { DbType, ExporterInfo, QueryResult } from '@kuxi/shared';
 import { useClipboard } from '../composables/useClipboard';
 import { useToast } from '../composables/useToast';
-import { openContextMenu } from '../composables/useContextMenu';
+import { openContextMenu, type MenuItem } from '../composables/useContextMenu';
+import { generateRowInsert, generateRowUpdate } from '../utils/sql';
 import BaseIcon from './BaseIcon.vue';
 
 const props = withDefaults(
@@ -43,6 +44,10 @@ const props = withDefaults(
     sortState?: { col: string; dir: 'asc' | 'desc' } | null;
     /** 正在写入新增行（按钮 loading 态） */
     inserting?: boolean;
+    /** 方言（生成 INSERT/UPDATE 用；查询标签也传，便于「复制为 JSON」之外的语句生成） */
+    dialect?: DbType;
+    /** 网格过滤文本（DataTab 过滤框传入，纯前端过滤，不匹配 SQL） */
+    filterText?: string;
   }>(),
   {
     loading: false,
@@ -54,6 +59,8 @@ const props = withDefaults(
     sortable: false,
     sortState: null,
     inserting: false,
+    dialect: 'sqlite',
+    filterText: '',
   },
 );
 
@@ -167,6 +174,54 @@ const isEmpty = computed<boolean>(
 /** 列名列表（空态保护，模板里反复用） */
 const columns = computed<string[]>(() => props.result?.columns ?? []);
 
+/**
+ * 过滤后的视图行：保留原始行号（item.index），确保暂存/选中/编辑的索引映射
+ * 与底层 result.rows 一致，过滤只是视图层变换，不改动数据本身。
+ * 任一单元格的展示文本包含过滤串即匹配（NULL 显示为 "NULL"，可被 "null" 命中）。
+ */
+const displayRows = computed<Array<{ index: number; row: Record<string, unknown> }>>(() => {
+  const result = props.result;
+  if (!result) return [];
+  const f = props.filterText.trim().toLowerCase();
+  if (!f) return result.rows.map((row, index) => ({ index, row }));
+  return result.rows
+    .map((row, index) => ({ index, row }))
+    .filter(({ row }) => columns.value.some((col) => cellText(row, col).toLowerCase().includes(f)));
+});
+
+/** 过滤后匹配到的行数（用于 meta「匹配 N / 共 M 行」） */
+const matchedCount = computed<number>(() => displayRows.value.length);
+
+/** 冻结第一数据列（行号列始终冻结由 CSS 保证）；横向滚动时常驻可见 */
+const freezeFirst = ref<boolean>(true);
+
+/** 列宽（px），键为列名；未设置的列按 CSS 自适应 */
+const colWidths = ref<Record<string, number>>({});
+
+/**
+ * 开始拖拽调整列宽：记录起点，挂 document 级 mousemove/up，拖动中实时写列宽。
+ * @param col 列名
+ * @param event mousedown 事件（handle 元素触发）
+ */
+function startResize(col: string, event: MouseEvent): void {
+  const th = (event.currentTarget as HTMLElement).closest('th');
+  const startX = event.clientX;
+  const startW = th?.offsetWidth ?? 100;
+  const onMove = (e: MouseEvent): void => {
+    colWidths.value[col] = Math.max(48, startW + (e.clientX - startX));
+  };
+  const onUp = (): void => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+}
+
 /** 取某列的类型标注（无 schema 信息时返回空串，列头就不显示） */
 function colType(col: string): string {
   return props.columnTypes[col] ?? '';
@@ -238,9 +293,21 @@ function onCellContextMenu(
     action: () => void exportWith(exporter),
   }));
 
+  // 「复制为」组：整行 INSERT / 整行 UPDATE（需表名+主键）/ JSON（任意结果），导航式分隔在组首
+  const copyAsItems: MenuItem[] = [];
+  const pushCopyAs = (label: string, action: () => void): void => {
+    copyAsItems.push({ label, separator: copyAsItems.length === 0, action });
+  };
+  if (props.tableName) {
+    pushCopyAs('复制为 INSERT', () => void copyAsInsert(row));
+    if (props.pkColumns.length) pushCopyAs('复制为 UPDATE', () => void copyAsUpdate(row));
+  }
+  if (props.result?.columns.length) pushCopyAs('复制为 JSON', () => void copyAsJson(row));
+
   openContextMenu(event, [
     { label: '复制单元格', action: () => void copyCell(row, col) },
     { label: '复制整行', action: () => void copyRow(row) },
+    ...copyAsItems,
     ...editItems,
     ...exportItems,
   ]);
@@ -342,6 +409,50 @@ async function copyRow(row: Record<string, unknown>): Promise<void> {
   const ok = await copy(line);
   if (ok) toast.success('已复制整行');
   else toast.error('复制失败');
+}
+
+/** 统一复制：成功/失败提示 */
+async function copyText(text: string, okMsg: string): Promise<void> {
+  const ok = await copy(text);
+  if (ok) toast.success(okMsg);
+  else toast.error('复制失败，请检查剪贴板权限');
+}
+
+/** 复制整行为 INSERT 语句（需要表名，一般在数据网格里可用） */
+async function copyAsInsert(row: Record<string, unknown>): Promise<void> {
+  if (!props.result) return;
+  if (!props.tableName) {
+    toast.info('查询标签无法识别表名，仅数据网格支持「复制为 INSERT」');
+    return;
+  }
+  try {
+    const sql = generateRowInsert(props.dialect, props.tableName, row, props.result.columns);
+    await copyText(sql, '已复制 INSERT 语句');
+  } catch (e) {
+    toast.error(`生成失败：${(e as Error).message}`);
+  }
+}
+
+/** 复制整行为 UPDATE 语句（需要表名 + 主键定位 WHERE） */
+async function copyAsUpdate(row: Record<string, unknown>): Promise<void> {
+  if (!props.result) return;
+  if (!props.tableName || !props.pkColumns.length) {
+    toast.info('该结果没有表名或主键，无法生成 UPDATE');
+    return;
+  }
+  const sql = generateRowUpdate(
+    props.dialect,
+    props.tableName,
+    row,
+    props.pkColumns,
+    props.result.columns,
+  );
+  await copyText(sql, '已复制 UPDATE 语句');
+}
+
+/** 复制整行为 JSON 对象（2 空格缩进，便于粘进文档/接口调试） */
+async function copyAsJson(row: Record<string, unknown>): Promise<void> {
+  await copyText(JSON.stringify(row, null, 2), '已复制 JSON');
 }
 
 /**
@@ -511,6 +622,14 @@ watch(
   { immediate: true },
 );
 
+/** 过滤文本变化：被过滤掉的行不应再停留在选中态，避免详情面板指向不可见行 */
+watch(
+  () => props.filterText,
+  () => {
+    selectedIndex.value = null;
+  },
+);
+
 onMounted(async () => {
   try {
     exporters.value = await window.kuxi.listExporters();
@@ -585,11 +704,26 @@ onMounted(async () => {
     <!-- 5) 有数据（前四种状态已排除，可安全断言 props.result 非空） -->
     <template v-else-if="props.result">
       <div class="meta">
-        返回 {{ props.result.rowCount }} 行 · {{ props.result.tookMs }}ms
+        <template v-if="props.filterText.trim()">
+          匹配 {{ matchedCount }} / 共 {{ props.result.rowCount }} 行 · {{ props.result.tookMs }}ms
+        </template>
+        <template v-else>
+          返回 {{ props.result.rowCount }} 行 · {{ props.result.tookMs }}ms
+        </template>
         <span v-if="props.result.truncated" class="warn">（结果已按上限截断）</span>
         <span class="tip">
           {{ props.editable ? '单击行看详情 · 双击改单格 · 底部可新增行' : '单击行看详情 · 右键复制/导出' }}
         </span>
+        <button
+          class="ghost freeze-toggle"
+          type="button"
+          :class="{ 'is-on': freezeFirst }"
+          title="冻结第一列：横向滚动时常驻可见"
+          @click="freezeFirst = !freezeFirst"
+        >
+          <BaseIcon name="lock" :size="13" />
+          <span>冻结首列</span>
+        </button>
       </div>
       <div class="table-wrap">
         <table>
@@ -600,7 +734,8 @@ onMounted(async () => {
                 v-for="col in columns"
                 :key="col"
                 scope="col"
-                :class="{ sortable: props.sortable }"
+                :class="['col-head', { sortable: props.sortable, 'col-frozen': freezeFirst && col === columns[0] }]"
+                :style="colWidths[col] ? { width: colWidths[col] + 'px' } : undefined"
                 :title="props.sortable ? '点击排序：升序 → 降序 → 取消' : undefined"
                 @click="onSortClick(col)"
               >
@@ -614,50 +749,58 @@ onMounted(async () => {
                   >{{ props.sortState.dir === 'asc' ? '▲' : '▼' }}</span>
                 </span>
                 <span v-if="colType(col)" class="th-type">{{ colType(col) }}</span>
+                <span
+                  class="col-resize"
+                  title="拖动调整列宽"
+                  @mousedown.prevent.stop="startResize(col, $event)"
+                  @click.stop
+                ></span>
               </th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="(row, index) in props.result.rows"
-              :key="index"
+              v-for="item in displayRows"
+              :key="item.index"
               class="data-row"
-              :class="{ 'is-selected': selectedIndex === index }"
-              @click="selectRow(index)"
+              :class="{ 'is-selected': selectedIndex === item.index }"
+              @click="selectRow(item.index)"
             >
-              <td class="row-num">{{ index + 1 }}</td>
+              <td class="row-num">{{ item.index + 1 }}</td>
               <td
                 v-for="col in columns"
                 :key="col"
                 class="cell"
                 :class="{
-                  'cell-null': isNull(row, col) && !stagedChange(index, col),
-                  'cell-staged': Boolean(stagedChange(index, col)),
-                  'is-editing': editing && editing.rowIndex === index && editing.col === col,
+                  'cell-null': isNull(item.row, col) && !stagedChange(item.index, col),
+                  'cell-staged': Boolean(stagedChange(item.index, col)),
+                  'is-editing': editing && editing.rowIndex === item.index && editing.col === col,
                   editable: canEdit(col),
+                  'col-frozen': freezeFirst && col === columns[0],
                 }"
+                :style="colWidths[col] ? { width: colWidths[col] + 'px' } : undefined"
                 :title="
-                  stagedChange(index, col)
+                  stagedChange(item.index, col)
                     ? '已修改（未提交）· 双击继续编辑'
                     : canEdit(col)
                       ? '双击编辑 · 右键复制'
                       : '右键复制'
                 "
                 tabindex="0"
-                @dblclick="startEdit(index, col, row)"
-                @contextmenu="onCellContextMenu($event, row, index, col)"
+                @dblclick="startEdit(item.index, col, item.row)"
+                @contextmenu="onCellContextMenu($event, item.row, item.index, col)"
               >
                 <input
-                  v-if="editing && editing.rowIndex === index && editing.col === col"
+                  v-if="editing && editing.rowIndex === item.index && editing.col === col"
                   ref="editInputRef"
                   v-model="editValue"
                   class="cell-input"
                   aria-label="编辑单元格"
-                  @keydown="onEditKeydown($event, row)"
-                  @blur="commitEdit(row)"
+                  @keydown="onEditKeydown($event, item.row)"
+                  @blur="commitEdit(item.row)"
                   @click.stop
                 />
-                <template v-else>{{ stagedCellText(row, index, col) }}</template>
+                <template v-else>{{ stagedCellText(item.row, item.index, col) }}</template>
               </td>
             </tr>
 

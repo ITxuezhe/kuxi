@@ -33,6 +33,7 @@ const { ready: aiReady } = useAi();
       table-name=""
       :pk-columns="[]"
       :inserting="false"
+      :dialect="wb.currentDbType.value"
     />
   </div>
 </template>

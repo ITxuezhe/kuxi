@@ -9,11 +9,18 @@
  *
  * 复用：设计表标签（DesignTab）与遗留的 Modal 封装（TableDesigner.vue）共用本表单。
  */
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 import type { DbType } from '@kuxi/shared';
-import { generateCreateTable, TYPE_OPTIONS, type FieldDef } from '../utils/sql';
+import {
+  columnsToFields,
+  generateCreateTable,
+  generateRebuildPlan,
+  TYPE_OPTIONS,
+  type FieldDef,
+} from '../utils/sql';
 import { useToast } from '../composables/useToast';
 import BaseIcon from './BaseIcon.vue';
+import ConfirmModal from './ConfirmModal.vue';
 
 const props = defineProps<{
   dbType: DbType | '';
@@ -31,10 +38,45 @@ const emit = defineEmits<{
 
 const toast = useToast();
 
+/** 是否编辑已有表（根据 initialName 在 schema 中是否存在判定） */
+const editMode = ref(false);
+/** 编辑模式下锁定的原始列名（用于禁用重命名；新增列不在其中，仍可命名） */
+const originalNames = ref<Set<string>>(new Set());
 const tableName = ref(props.initialName ?? '');
 const fields = ref<FieldDef[]>([]);
 const busy = ref(false);
 const errorMsg = ref('');
+
+/** DROP 原表的二次确认弹窗状态 */
+const dropConfirmOpen = ref(false);
+const dropConfirmBusy = ref(false);
+let dropResolver: ((ok: boolean) => void) | null = null;
+
+if (!props.initialName) {
+  fields.value.push(blankField());
+}
+
+/** 挂载时按 initialName 探查 schema：若表已存在则进入编辑模式并预填字段 */
+async function initFromSchema(): Promise<void> {
+  if (!props.initialName) return;
+  if (!props.connected || !props.connectionId) return;
+  try {
+    const schema = await window.kuxi.getSchema(props.connectionId);
+    const info = schema.tables.find((t) => t.name === props.initialName);
+    if (info) {
+      editMode.value = true;
+      tableName.value = info.name;
+      fields.value = columnsToFields(info.columns);
+      originalNames.value = new Set(info.columns.map((c) => c.name));
+      return;
+    }
+  } catch {
+    /* 查不到就以新建向导处理 */
+  }
+  if (!fields.value.length) fields.value.push(blankField());
+}
+
+onMounted(() => void initFromSchema());
 
 /** 当前方言的类型选项 */
 const typeOptions = (): string[] =>
@@ -157,15 +199,105 @@ async function onCreate(): Promise<void> {
     busy.value = false;
   }
 }
+
+/** 编辑已有表：生成重建表计划并分步执行（DROP 需二次确认） */
+async function onSave(): Promise<void> {
+  const invalid = validate();
+  if (invalid) {
+    errorMsg.value = invalid;
+    return;
+  }
+  if (!props.dbType) {
+    errorMsg.value = '请先在左侧选择数据库类型';
+    return;
+  }
+  if (!props.connected) {
+    errorMsg.value = '当前连接未建立，请先重新连接';
+    return;
+  }
+  const validFields = fields.value.filter((f) => f.name.trim());
+  const plan = generateRebuildPlan(
+    props.dbType,
+    tableName.value.trim(),
+    validFields,
+    Array.from(originalNames.value),
+  );
+  await runSteps(plan.steps);
+}
+
+/** 逐条执行重建表步骤；遇 DROP 触发二次确认，用户取消则中止并保留旧表 */
+async function runSteps(steps: string[]): Promise<void> {
+  busy.value = true;
+  errorMsg.value = '';
+  try {
+    for (let i = 0; i < steps.length; i++) {
+      const sql = steps[i];
+      if (!sql.trim()) continue; // 无列可拷贝（极端：删光旧列）时跳过 INSERT
+      let outcome = await window.kuxi.execute(props.connectionId, sql, false);
+      if (outcome.status === 'confirm') {
+        const ok = await waitDropConfirm();
+        if (!ok) {
+          toast.info('已取消，原表未改动');
+          return;
+        }
+        dropConfirmBusy.value = true;
+        try {
+          outcome = await window.kuxi.execute(props.connectionId, sql, true);
+        } finally {
+          dropConfirmBusy.value = false;
+        }
+      }
+      if (outcome.status === 'error') {
+        errorMsg.value = `第 ${i + 1} 步失败：${outcome.message}`;
+        toast.error(errorMsg.value);
+        return;
+      }
+    }
+    toast.success(`已修改表「${tableName.value.trim()}」的结构`);
+    emit('created');
+    emit('close');
+  } catch (e) {
+    errorMsg.value = (e as Error).message;
+    toast.error(`修改失败：${errorMsg.value}`);
+  } finally {
+    busy.value = false;
+  }
+}
+
+/** 等待用户对 DROP 原表的二次确认，返回是否确认 */
+function waitDropConfirm(): Promise<boolean> {
+  dropConfirmOpen.value = true;
+  return new Promise<boolean>((resolve) => {
+    dropResolver = resolve;
+  });
+}
+function onDropConfirm(): void {
+  dropConfirmOpen.value = false;
+  dropResolver?.(true);
+  dropResolver = null;
+}
+function onDropCancel(): void {
+  dropConfirmOpen.value = false;
+  dropResolver?.(false);
+  dropResolver = null;
+}
 </script>
 
 <template>
   <div class="designer-form">
     <div class="field">
       <label for="tbl-name">表名</label>
-      <input id="tbl-name" v-model="tableName" placeholder="例如 users" />
-      <span v-if="initialName" class="designer-hint">
-        提示：当前为新建表向导；如需修改现有表结构（ALTER）将在后续版本支持，改名可另建。
+      <input
+        id="tbl-name"
+        v-model="tableName"
+        :disabled="editMode"
+        :placeholder="editMode ? '' : '例如 users'"
+      />
+      <span v-if="initialName && !editMode" class="designer-hint">
+        提示：当前为新建表向导；改名可另建新表。
+      </span>
+      <span v-else-if="editMode" class="designer-hint warn-hint">
+        编辑模式：列名已锁定。修改类型 / 非空 / 默认值或增删列后，将重建表（见保存时的确认提示）。
       </span>
     </div>
 
@@ -182,7 +314,13 @@ async function onCreate(): Promise<void> {
         <span></span>
       </div>
       <div v-for="(f, index) in fields" :key="index" class="field-grid">
-        <input v-model="f.name" placeholder="字段名" aria-label="字段名" />
+        <input
+          v-model="f.name"
+          placeholder="字段名"
+          aria-label="字段名"
+          :disabled="editMode && originalNames.has(f.name)"
+          :title="editMode && originalNames.has(f.name) ? '编辑模式下列名锁定，不可重命名' : undefined"
+        />
         <input v-model="f.type" list="db-types" aria-label="类型" />
         <input v-model="f.length" class="col-narrow" placeholder="如 255" aria-label="长度或精度" />
         <input v-model="f.primaryKey" type="checkbox" class="col-narrow" aria-label="主键" />
@@ -213,9 +351,29 @@ async function onCreate(): Promise<void> {
 
     <div class="designer-actions">
       <button type="button" @click="emit('close')">取消</button>
-      <button type="button" class="primary" :disabled="busy" @click="onCreate">
+      <button
+        v-if="editMode"
+        type="button"
+        class="primary"
+        :disabled="busy"
+        @click="onSave"
+      >
+        {{ busy ? '保存中…' : '保存修改' }}
+      </button>
+      <button v-else type="button" class="primary" :disabled="busy" @click="onCreate">
         {{ busy ? '创建中…' : '创建表' }}
       </button>
     </div>
+
+    <ConfirmModal
+      :open="dropConfirmOpen"
+      danger
+      title="确认删除原表并重命名"
+      confirm-text="确认重建"
+      :busy="dropConfirmBusy"
+      message="修改表结构将通过「重建表」完成：新建临时表 → 复制数据 → 删除原表 → 重命名。此操作会删除原表，可能丢失索引 / 外键 / 触发器等约束。请确认数据已备份或可接受重建。"
+      @cancel="onDropCancel"
+      @confirm="onDropConfirm"
+    />
   </div>
 </template>

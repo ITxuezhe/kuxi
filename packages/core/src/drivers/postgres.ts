@@ -8,6 +8,15 @@ import type {
 } from '@kuxi/shared';
 import type { IDriver } from './base';
 
+/** 建连超时（ms） */
+const CONNECT_TIMEOUT_MS = 10_000;
+/** 单条查询超时（ms）：pg 的 query_timeout 客户端侧取消，statement_timeout 服务端取消 */
+const QUERY_TIMEOUT_MS = 60_000;
+
+/** 视为连接层故障的错误文案（命中后丢弃当前 client，下次查询自动重连） */
+const CONN_DEAD_RE =
+  /connection error|terminated|ECONNRESET|EPIPE|ETIMEDOUT|ECONNREFUSED|socket/i;
+
 /** PostgreSQL 驱动（基于 pg，纯 JS） */
 export class PostgresDriver implements IDriver {
   private client: pg.Client | null = null;
@@ -21,6 +30,11 @@ export class PostgresDriver implements IDriver {
       password: this.config.password,
       database: this.config.database,
       ssl: this.config.ssl ? { rejectUnauthorized: false } : false,
+      connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+      query_timeout: QUERY_TIMEOUT_MS,
+      statement_timeout: QUERY_TIMEOUT_MS,
+      // TCP 保活：闲置连接不再被 NAT/防火墙静默掐断
+      keepAlive: true,
     });
     await this.client.connect();
   }
@@ -29,10 +43,26 @@ export class PostgresDriver implements IDriver {
     return this.client !== null;
   }
 
+  /** 连接不可用时自动补建（密码在 Main 进程的 config 里，可直接重连） */
+  private async ensureConnected(): Promise<pg.Client> {
+    if (!this.client) await this.connect();
+    return this.client as pg.Client;
+  }
+
   async query(sql: string, params: unknown[] = []): Promise<QueryResult> {
-    if (!this.client) throw new Error('未连接');
+    const client = await this.ensureConnected();
     const start = performance.now();
-    const res = await this.client.query(sql, params);
+    let res: pg.QueryResult;
+    try {
+      res = await client.query(sql, params);
+    } catch (e) {
+      // 连接层故障时丢弃 client，下一次查询自动重连
+      const err = e as { message?: string };
+      if (CONN_DEAD_RE.test(err?.message ?? '')) {
+        this.client = null;
+      }
+      throw e;
+    }
     const cols = (res.fields ?? []).map((f) => f.name);
     const rows = res.rows ?? [];
     const tookMs = Math.round((performance.now() - start) * 100) / 100;
