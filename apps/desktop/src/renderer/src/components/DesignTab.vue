@@ -18,9 +18,9 @@ function onCreated(): void {
 <template>
   <div class="design-tab">
     <TableDesignerForm
-      :db-type="wb.currentDbType"
-      :connected="wb.connected"
-      :connection-id="wb.connectionId"
+      :db-type="wb.currentDbType.value"
+      :connected="wb.connected.value"
+      :connection-id="wb.connectionId.value"
       :initial-name="tab.designTable"
       @created="onCreated"
       @close="() => wb.close(tab.id)"

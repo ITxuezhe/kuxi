@@ -789,7 +789,10 @@ body.editor-resizing * {
   overflow: auto;
 }
 table {
-  border-collapse: collapse;
+  /* 必须 separate：collapse 模式下 Chromium 的 sticky 表头背景会失效，
+     滚动时数据行从表头下透出（冻结首行形同虚设） */
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   font-size: var(--font-size);
 }
@@ -808,7 +811,9 @@ th {
   background: var(--panel-2);
   position: sticky;
   top: 0;
-  z-index: 1;
+  /* 表头层级必须高于所有 body 单元格（含冻结列 td.z1/z2），
+     否则纵向滚动时数据行会盖到表头上，首行冻结形同虚设 */
+  z-index: 5;
   font-weight: 600;
   color: var(--muted);
 }
@@ -879,7 +884,7 @@ td.col-frozen {
   background: var(--panel);
 }
 th.col-frozen {
-  z-index: 3;
+  z-index: 6;
   background: var(--panel-2);
 }
 tbody tr:hover td.col-frozen {
@@ -961,7 +966,7 @@ td.row-num {
   user-select: none;
 }
 th.row-num {
-  z-index: 3;
+  z-index: 6;
 }
 tbody tr:hover td {
   background: var(--primary-soft);
@@ -1943,10 +1948,94 @@ button.danger:hover:not(:disabled) {
 }
 .field-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.6fr 0.5fr 0.5fr 0.5fr 1fr 26px;
+  grid-template-columns: 1.2fr 1fr 0.6fr 0.5fr 0.5fr 0.5fr 1.4fr 26px;
   gap: 6px;
   align-items: center;
   margin-bottom: 6px;
+}
+
+/* 类型下拉 combobox（datalist 在 Electron 深色主题下不可用，自绘替代） */
+.type-combo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.type-combo input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 24px;
+}
+.type-toggle {
+  position: absolute;
+  right: 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 10px;
+  line-height: 1;
+}
+.type-toggle:hover {
+  color: var(--text);
+}
+.type-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.type-list li {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.type-list li:hover {
+  background: var(--panel-3);
+}
+.type-list .type-empty {
+  color: var(--muted);
+  cursor: default;
+}
+.type-list .type-empty:hover {
+  background: transparent;
+}
+
+/* 默认值单元格：日期型走原生选择器 + 「当前时间」快捷键 */
+.default-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.default-cell input {
+  flex: 1;
+  min-width: 0;
+}
+.now-btn {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* 原生日期/时间控件跟随应用主题（深色下日历、时钟图标才可见） */
+input[type='date'],
+input[type='datetime-local'],
+input[type='time'] {
+  color-scheme: dark light;
 }
 .field-grid.head {
   font-size: var(--font-sm);

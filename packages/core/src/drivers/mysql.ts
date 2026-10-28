@@ -129,17 +129,20 @@ export class MysqlDriver implements IDriver {
     const names = await this.listTables();
     const tables: TableInfo[] = [];
     for (const name of names) {
+      // column_type 带 full 定义（varchar(255) / enum('a','b') / int unsigned），
+      // data_type 是裸类型名（varchar）——重建表时丢长度会直接 1064
       const cols = await this.query(
-        `SELECT column_name, data_type, is_nullable, column_key, column_default
+        `SELECT column_name, column_type, column_extra, is_nullable, column_key, column_default
          FROM information_schema.columns WHERE table_schema = ? AND table_name = ?`,
         [this.config.database, name],
       );
       const columns: ColumnInfo[] = cols.rows.map((r) => ({
         name: String(r.column_name),
-        type: String(r.data_type),
+        type: String(r.column_type ?? r.data_type ?? ''),
         nullable: String(r.is_nullable) === 'YES',
         primaryKey: String(r.column_key) === 'PRI',
         defaultValue: r.column_default === null ? null : String(r.column_default),
+        autoIncrement: /auto_increment/i.test(String(r.column_extra ?? '')),
       }));
       tables.push({ name, columns });
     }

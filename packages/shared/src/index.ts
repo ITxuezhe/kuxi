@@ -131,6 +131,8 @@ export interface ColumnInfo {
   nullable: boolean;
   primaryKey: boolean;
   defaultValue?: string | null;
+  /** 是否自增列（MySQL 重建表时必须保留 AUTO_INCREMENT） */
+  autoIncrement?: boolean;
 }
 
 export interface TableInfo {

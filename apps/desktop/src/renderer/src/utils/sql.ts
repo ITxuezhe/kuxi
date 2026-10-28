@@ -10,39 +10,121 @@ import { format } from 'sql-formatter';
 import type { ColumnInfo, DbType } from '@kuxi/shared';
 
 /** 各方言常用类型（建表设计器下拉 + 自增等默认值） */
+/** 各方言类型候选（对齐 Navicat/DataGrip：数值 → 字符串 → 日期时间 → JSON/其他） */
 export const TYPE_OPTIONS: Record<DbType, string[]> = {
-  sqlite: ['INTEGER', 'TEXT', 'REAL', 'BLOB', 'NUMERIC'],
-  mysql: [
+  // SQLite 是动态类型，仅 5 个存储亲和性；其余是行业惯用别名（会映射到亲和性）
+  sqlite: [
+    'INTEGER',
+    'TEXT',
+    'REAL',
+    'BLOB',
+    'NUMERIC',
     'INT',
     'BIGINT',
-    'TINYINT',
+    'BOOLEAN',
     'VARCHAR',
-    'TEXT',
-    'LONGTEXT',
-    'DECIMAL',
+    'CHAR',
     'FLOAT',
     'DOUBLE',
+    'DECIMAL',
     'DATE',
     'DATETIME',
     'TIMESTAMP',
-    'BOOLEAN',
     'JSON',
   ],
+  mysql: [
+    // 整数
+    'TINYINT',
+    'SMALLINT',
+    'MEDIUMINT',
+    'INT',
+    'BIGINT',
+    // 定点/浮点
+    'DECIMAL',
+    'NUMERIC',
+    'FLOAT',
+    'DOUBLE',
+    'BIT',
+    'BOOLEAN',
+    // 字符串
+    'CHAR',
+    'VARCHAR',
+    'TINYTEXT',
+    'TEXT',
+    'MEDIUMTEXT',
+    'LONGTEXT',
+    // 二进制
+    'BINARY',
+    'VARBINARY',
+    'TINYBLOB',
+    'BLOB',
+    'MEDIUMBLOB',
+    'LONGBLOB',
+    // 枚举/集合
+    'ENUM',
+    'SET',
+    // 日期时间
+    'DATE',
+    'TIME',
+    'DATETIME',
+    'TIMESTAMP',
+    'YEAR',
+    // JSON / 空间
+    'JSON',
+    'GEOMETRY',
+    'POINT',
+    'LINESTRING',
+    'POLYGON',
+  ],
   postgres: [
+    // 整数
+    'SMALLINT',
     'INTEGER',
     'BIGINT',
-    'SMALLINT',
-    'TEXT',
-    'VARCHAR',
+    // 伪类型（自增）
+    'SERIAL',
+    'BIGSERIAL',
+    // 定点/浮点/货币
+    'DECIMAL',
     'NUMERIC',
     'REAL',
     'DOUBLE PRECISION',
-    'BOOLEAN',
+    'MONEY',
+    // 字符串
+    'VARCHAR',
+    'CHARACTER VARYING',
+    'CHAR',
+    'CHARACTER',
+    'TEXT',
+    // 二进制
+    'BYTEA',
+    // 日期时间
     'DATE',
+    'TIME',
+    'TIMETZ',
     'TIMESTAMP',
     'TIMESTAMPTZ',
-    'UUID',
+    'INTERVAL',
+    // 布尔 / JSON / 其他
+    'BOOLEAN',
+    'JSON',
     'JSONB',
+    'UUID',
+    'XML',
+    'INET',
+    'CIDR',
+    'MACADDR',
+    // 数组
+    'INTEGER[]',
+    'TEXT[]',
+    'JSONB[]',
+    // 几何
+    'POINT',
+    'LINE',
+    'BOX',
+    'PATH',
+    'POLYGON',
+    'CIRCLE',
   ],
 };
 
@@ -65,8 +147,8 @@ function ident(dialect: DbType, name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-/** 是否需要长度后缀 */
-const HAS_LENGTH = /^(VARCHAR|CHAR|CHARACTER|DECIMAL|NUMERIC|DOUBLE|FLOAT|REAL)/i;
+/** 是否需要长度/取值后缀（ENUM/SET 的「长度」是取值列表，如 'a','b'） */
+const HAS_LENGTH = /^(VARCHAR|CHAR|CHARACTER|DECIMAL|NUMERIC|DOUBLE|FLOAT|REAL|ENUM|SET)/i;
 
 /** 默认值是否需要加引号（数值型不加） */
 const NUMERIC_TYPE = /^(INT|BIGINT|SMALLINT|TINYINT|INTEGER|REAL|DOUBLE|FLOAT|DECIMAL|NUMERIC|SERIAL|BIGSERIAL)/i;
@@ -94,17 +176,22 @@ function quoteDefault(value: string, type: string): string {
  */
 export function generateCreateTable(dialect: DbType, table: string, fields: FieldDef[]): string {
   const lines = fields.map((field) => {
-    let type = field.type.toUpperCase();
+    // 只大写类型关键字；括号内（ENUM 取值等）原样保留，大写会改变数据语义
+    const rawType = field.type.trim();
+    const parenIdx = rawType.indexOf('(');
+    const typeHead = (parenIdx === -1 ? rawType : rawType.slice(0, parenIdx)).toUpperCase();
+    const typeTail = parenIdx === -1 ? '' : rawType.slice(parenIdx);
+    let type = typeHead + typeTail;
 
     // PostgreSQL 自增 → 换成 SERIAL 伪类型
     if (field.autoIncrement && dialect === 'postgres') {
       type = /^BIGINT/.test(type) ? 'BIGSERIAL' : 'SERIAL';
     }
 
-    // 长度/精度后缀
+    // 长度/精度后缀（类型已自带括号时不再追加，防 `VARCHAR(255)(255)`）
     const length = field.length?.trim();
-    if (length && HAS_LENGTH.test(type)) {
-      type = `${type}(${length})`;
+    if (length && HAS_LENGTH.test(typeHead) && !typeTail) {
+      type = `${typeHead}(${length})`;
     }
 
     const parts: string[] = [ident(dialect, field.name), type];
@@ -396,7 +483,7 @@ export function columnsToFields(cols: ColumnInfo[]): FieldDef[] {
       length: m ? m[2].trim() : '',
       primaryKey: c.primaryKey,
       notNull: !c.nullable,
-      autoIncrement: false,
+      autoIncrement: c.autoIncrement ?? false,
       defaultValue: c.defaultValue ?? '',
     };
   });

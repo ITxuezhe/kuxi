@@ -78,9 +78,70 @@ async function initFromSchema(): Promise<void> {
 
 onMounted(() => void initFromSchema());
 
-/** 当前方言的类型选项 */
+/** 当前方言的类型选项（dbType 异常时兜底 SQLite，避免 undefined 崩溃） */
 const typeOptions = (): string[] =>
-  props.dbType ? TYPE_OPTIONS[props.dbType] : TYPE_OPTIONS.sqlite;
+  (props.dbType && TYPE_OPTIONS[props.dbType]) || TYPE_OPTIONS.sqlite;
+
+/* ── 类型下拉 combobox：datalist 在 Electron 深色主题下不可用，自绘下拉 ── */
+/** 当前展开类型列表的行索引（-1 = 全部收起） */
+const openTypeIdx = ref(-1);
+/** 类型过滤词（跟随输入框内容） */
+const typeFilter = ref('');
+
+function openTypes(index: number): void {
+  openTypeIdx.value = index;
+  typeFilter.value = '';
+}
+function closeTypes(): void {
+  openTypeIdx.value = -1;
+}
+function toggleTypes(index: number): void {
+  if (openTypeIdx.value === index) closeTypes();
+  else openTypes(index);
+}
+function onTypeInput(index: number, value: string): void {
+  fields.value[index].type = value;
+  typeFilter.value = value;
+  if (openTypeIdx.value !== index) openTypeIdx.value = index;
+}
+function filteredTypes(): string[] {
+  const q = typeFilter.value.trim().toUpperCase();
+  const opts = typeOptions();
+  return q ? opts.filter((t) => t.includes(q)) : opts;
+}
+function pickType(index: number, t: string): void {
+  fields.value[index].type = t;
+  closeTypes();
+}
+
+/* ── 日期时间类型：默认值换用原生日期选择器 ── */
+const DATE_LIKE_RE = /^(DATE|DATETIME|TIMESTAMP|TIMESTAMPTZ|TIME|YEAR)/i;
+function isDateLike(type: string): boolean {
+  return DATE_LIKE_RE.test(type.trim());
+}
+/** 映射为原生 input type：date / datetime-local / time，其余 text */
+function dateInputType(type: string): string {
+  const t = type.trim().toUpperCase();
+  if (/^DATE$/.test(t)) return 'date';
+  if (/^TIME/.test(t)) return 'time';
+  if (/^(DATETIME|TIMESTAMP)/.test(t)) return 'datetime-local';
+  return 'text';
+}
+/** 日期型默认值快捷填入「当前时间」关键字（生成 DDL 时按关键字原样输出） */
+function setDefaultNow(index: number): void {
+  fields.value[index].defaultValue = 'CURRENT_TIMESTAMP';
+}
+/** datetime-local 控件的值带 'T'（2026-01-02T10:00），SQL 需要 '2026-01-02 10:00' */
+function normalizeDateDefaults(): void {
+  for (const f of fields.value) {
+    if (isDateLike(f.type) && f.defaultValue) {
+      f.defaultValue = f.defaultValue.replace(
+        /^(\d{4}-\d{2}-\d{2})T(.*)$/,
+        '$1 $2',
+      );
+    }
+  }
+}
 
 /** 方言展示名 */
 const dialectLabel = (): string => {
@@ -153,11 +214,21 @@ function validate(): string {
       return `字段名「${name}」含非法字符（不能以数字开头）`;
     }
   }
+  // MySQL 的 VARCHAR/VARBINARY 必须带长度，缺了会 1064（PG/SQLite 合法，不用拦）
+  if (props.dbType === 'mysql') {
+    for (const f of validFields) {
+      const t = f.type.trim().toUpperCase();
+      if (/^(VARCHAR|VARBINARY)$/.test(t) && !(f.length ?? '').trim() && !t.includes('(')) {
+        return `字段「${f.name.trim()}」的类型 ${t} 必须填写长度（如 ${t}(255)）`;
+      }
+    }
+  }
   return '';
 }
 
 /** 创建表 */
 async function onCreate(): Promise<void> {
+  normalizeDateDefaults();
   const invalid = validate();
   if (invalid) {
     errorMsg.value = invalid;
@@ -202,6 +273,7 @@ async function onCreate(): Promise<void> {
 
 /** 编辑已有表：生成重建表计划并分步执行（DROP 需二次确认） */
 async function onSave(): Promise<void> {
+  normalizeDateDefaults();
   const invalid = validate();
   if (invalid) {
     errorMsg.value = invalid;
@@ -321,12 +393,62 @@ function onDropCancel(): void {
           :disabled="editMode && originalNames.has(f.name)"
           :title="editMode && originalNames.has(f.name) ? '编辑模式下列名锁定，不可重命名' : undefined"
         />
-        <input v-model="f.type" list="db-types" aria-label="类型" />
+        <div class="type-combo">
+          <input
+            :value="f.type"
+            aria-label="类型"
+            autocomplete="off"
+            @input="onTypeInput(index, ($event.target as HTMLInputElement).value)"
+            @focus="openTypes(index)"
+            @keydown.escape="closeTypes"
+          />
+          <button
+            type="button"
+            class="type-toggle"
+            tabindex="-1"
+            :aria-label="openTypeIdx === index ? '收起类型列表' : '展开类型列表'"
+            @mousedown.prevent
+            @click="toggleTypes(index)"
+          >
+            {{ openTypeIdx === index ? '▴' : '▾' }}
+          </button>
+          <ul v-if="openTypeIdx === index" class="type-list" role="listbox">
+            <li
+              v-for="t in filteredTypes()"
+              :key="t"
+              role="option"
+              :aria-selected="t === f.type"
+              @mousedown.prevent
+              @click="pickType(index, t)"
+            >
+              {{ t }}
+            </li>
+            <li v-if="!filteredTypes().length" class="type-empty">无匹配，可直接使用自定义类型</li>
+          </ul>
+        </div>
         <input v-model="f.length" class="col-narrow" placeholder="如 255" aria-label="长度或精度" />
         <input v-model="f.primaryKey" type="checkbox" class="col-narrow" aria-label="主键" />
         <input v-model="f.notNull" type="checkbox" class="col-narrow" aria-label="非空" />
         <input v-model="f.autoIncrement" type="checkbox" class="col-narrow" aria-label="自增" />
-        <input v-model="f.defaultValue" placeholder="默认值" aria-label="默认值" />
+        <div class="default-cell">
+          <input
+            v-if="isDateLike(f.type)"
+            v-model="f.defaultValue"
+            :type="dateInputType(f.type)"
+            class="date-default"
+            aria-label="默认值（日期时间选择）"
+          />
+          <input v-else v-model="f.defaultValue" placeholder="默认值" aria-label="默认值" />
+          <button
+            v-if="isDateLike(f.type)"
+            type="button"
+            class="ghost now-btn"
+            title="默认值设为当前时间（写入 CURRENT_TIMESTAMP）"
+            @click="setDefaultNow(index)"
+          >
+            当前时间
+          </button>
+        </div>
         <button
           type="button"
           class="icon-btn danger-text"
@@ -338,9 +460,6 @@ function onDropCancel(): void {
           <BaseIcon name="close" :size="16" />
         </button>
       </div>
-      <datalist id="db-types">
-        <option v-for="t in typeOptions()" :key="t" :value="t" />
-      </datalist>
       <button type="button" class="ghost add-field" @click="addField">
         <BaseIcon name="plus" :size="16" />
         <span>添加字段</span>
