@@ -142,6 +142,11 @@ const selectedIndex = ref<number | null>(null);
 /** 新增行的草稿：列名 → 用户输入的文本 */
 const draft = ref<Record<string, string>>({});
 
+/** 新增行 <tr> 元素引用，用于连续录入后自动聚焦第一个输入框 */
+const draftRowEl = ref<HTMLTableRowElement | null>(null);
+/** saveDraft 成功后是否自动聚焦新增行首列（支持连敲 Enter 连续录入） */
+const focusDraftAfterInsert = ref(false);
+
 /** 骨架屏行数，模拟真实表格观感 */
 const SKELETON_ROWS = 6;
 
@@ -556,6 +561,7 @@ function saveDraft(): void {
     toast.info('请先填写至少一个字段');
     return;
   }
+  focusDraftAfterInsert.value = true;
   emit('insert-row', { values, numericColumns: [...numericColumns.value] });
 }
 
@@ -618,6 +624,14 @@ watch(
     staged.value.clear();
     editing.value = null;
     clearDraft();
+    if (focusDraftAfterInsert.value) {
+      focusDraftAfterInsert.value = false;
+      // 插入成功后自动聚焦新增行首列，支持连敲 Enter 连续录入（TablePlus 式）
+      void nextTick(() => {
+        const input = draftRowEl.value?.querySelector<HTMLInputElement>('.draft-input');
+        input?.focus();
+      });
+    }
   },
   { immediate: true },
 );
@@ -805,7 +819,7 @@ onMounted(async () => {
             </tr>
 
             <!-- 新增行：可编辑网格底部常驻的空白行（对齐 Navicat 的 * 行） -->
-            <tr v-if="props.editable" class="draft-row">
+            <tr v-if="props.editable" class="draft-row" ref="draftRowEl">
               <td class="row-num">
                 <span class="draft-mark" title="新增行">＋</span>
               </td>
