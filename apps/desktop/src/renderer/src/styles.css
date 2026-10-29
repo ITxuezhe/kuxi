@@ -184,6 +184,24 @@ textarea:disabled {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background-color: var(--bg);
+  background-image: var(--app-bg-image, none);
+  background-size: cover;
+  background-position: center;
+}
+/* 背景图激活时的暗化遮罩：降低背景图干扰、保证面板文字可读（仅作氛围，不挡交互） */
+.app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 0;
+  pointer-events: none;
+}
+/* 内容层抬到遮罩之上，背景图只在内容区之外 / 半透明面板处透出 */
+.app > * {
+  position: relative;
+  z-index: 1;
 }
 
 .topbar {
@@ -1234,6 +1252,32 @@ tbody tr.draft-row td {
   background: var(--primary-soft);
   color: var(--text);
   font-weight: 600;
+}
+
+/* 背景图片块（外观设置第四项） */
+.bg-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bg-thumb {
+  height: 64px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-size: cover;
+  background-position: center;
+}
+.bg-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+.bg-actions {
+  display: flex;
+  gap: var(--gap-xs);
+}
+.bg-actions .ghost {
+  flex: 1;
 }
 
 /* ---------- Toast ---------- */

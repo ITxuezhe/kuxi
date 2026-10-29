@@ -50,10 +50,13 @@ export interface FontSizeOption {
 export const THEME_STORAGE_KEY = 'kuxi-theme';
 export const DENSITY_STORAGE_KEY = 'kuxi-density';
 export const FONTSIZE_STORAGE_KEY = 'kuxi-fontsize';
+export const BACKGROUND_STORAGE_KEY = 'kuxi-bg';
 
 export const DEFAULT_THEME: ThemeName = 'dark';
 export const DEFAULT_DENSITY: DensityName = 'comfortable';
 export const DEFAULT_FONTSIZE: FontSizeName = 'md';
+/** 默认无背景图（空串），使用纯色背景 */
+export const DEFAULT_BACKGROUND = '';
 
 
 /** 主题列表（顺序即 UI 展示顺序，dark 为默认） */
@@ -145,9 +148,16 @@ function initialFontSize(): FontSizeName {
   return isFontSizeName(stored) ? stored : DEFAULT_FONTSIZE;
 }
 
+/** 从 localStorage 初始化背景图（dataURL 或空串） */
+function initialBackground(): string {
+  const stored = readStorage(BACKGROUND_STORAGE_KEY);
+  return stored && stored.startsWith('data:image') ? stored : DEFAULT_BACKGROUND;
+}
+
 const theme = ref<ThemeName>(initialTheme());
 const density = ref<DensityName>(initialDensity());
 const fontSize = ref<FontSizeName>(initialFontSize());
+const backgroundImage = ref<string>(initialBackground());
 
 /**
  * 把当前主题写入 <html data-theme>。
@@ -173,11 +183,27 @@ function applyFontSizeToDom(next: FontSizeName): void {
   document.documentElement.setAttribute('data-fontsize', next);
 }
 
+/**
+ * 把背景图写入 <html>：非空时加 data-bg="on" 并设 --app-bg-image（CSS 背景图变量），
+ * 空串时移除，恢复纯色背景。半透明面板由 themes.css 的 [data-bg='on'] 覆盖生效。
+ * @param next dataURL 或空串
+ */
+function applyBackgroundToDom(next: string): void {
+  if (next) {
+    document.documentElement.setAttribute('data-bg', 'on');
+    document.documentElement.style.setProperty('--app-bg-image', `url("${next}")`);
+  } else {
+    document.documentElement.removeAttribute('data-bg');
+    document.documentElement.style.removeProperty('--app-bg-image');
+  }
+}
+
 /** 模块加载即同步 DOM，保证首帧就是持久化的主题/密度/字号（无闪烁） */
 if (typeof document !== 'undefined') {
   applyThemeToDom(theme.value);
   applyDensityToDom(density.value);
   applyFontSizeToDom(fontSize.value);
+  applyBackgroundToDom(backgroundImage.value);
 }
 
 /**
@@ -219,6 +245,19 @@ export function setFontSize(next: FontSizeName): void {
   writeStorage(FONTSIZE_STORAGE_KEY, next);
 }
 
+/**
+ * 设置背景图：仅接受 data:image 开头的 dataURL 或空串（清除）。
+ * @param next dataURL 或空串
+ */
+export function setBackgroundImage(next: string): void {
+  if (next !== '' && !next.startsWith('data:image')) {
+    return;
+  }
+  backgroundImage.value = next;
+  applyBackgroundToDom(next);
+  writeStorage(BACKGROUND_STORAGE_KEY, next);
+}
+
 /** 当前主题元信息（含中文名与色板） */
 export function useTheme(): {
   theme: Readonly<Ref<ThemeName>>;
@@ -251,11 +290,13 @@ export function useTheme(): {
     themeOption,
     densityOption,
     fontSizeOption,
-    themes: THEMES,
-    densities: DENSITIES,
-    fontSizes: FONT_SIZES,
-    setTheme,
-    setDensity,
-    setFontSize,
-  };
+  themes: THEMES,
+  densities: DENSITIES,
+  fontSizes: FONT_SIZES,
+  backgroundImage: readonly(backgroundImage),
+  setTheme,
+  setDensity,
+  setFontSize,
+  setBackgroundImage,
+};
 }

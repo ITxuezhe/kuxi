@@ -17,6 +17,7 @@ import {
   type FontSizeName,
   type ThemeName,
 } from '../composables/useTheme';
+import { toast } from '../composables/useToast';
 import BaseIcon from './BaseIcon.vue';
 
 const {
@@ -27,10 +28,49 @@ const {
   themes,
   densities,
   fontSizes,
+  backgroundImage,
+  setBackgroundImage,
   setTheme,
   setDensity,
   setFontSize,
 } = useTheme();
+
+const fileInput = ref<HTMLInputElement | null>(null);
+
+/** 触发系统文件选择框（选背景图） */
+function pickImage(): void {
+  fileInput.value?.click();
+}
+
+/** 选图后：转 base64 dataURL 并应用（限制体积，避免 localStorage 溢出） */
+function onFileChange(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = ''; // 重置，允许重复选择同一文件
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) {
+    toast.info('图片过大（建议 < 3MB），已自动跳过');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const data = typeof reader.result === 'string' ? reader.result : '';
+    if (data.startsWith('data:image')) {
+      setBackgroundImage(data);
+      toast.success('已应用背景图片');
+    } else {
+      toast.error('请选择图片文件');
+    }
+  };
+  reader.onerror = () => toast.error('读取图片失败');
+  reader.readAsDataURL(file);
+}
+
+/** 清除背景图，恢复纯色 */
+function clearImage(): void {
+  setBackgroundImage('');
+  toast.info('已清除背景图片');
+}
 
 const open = ref(false);
 const root = ref<HTMLElement | null>(null);
@@ -206,6 +246,17 @@ onBeforeUnmount(() => {
         >
           {{ item.label }}
         </button>
+      </div>
+
+      <h3>背景图片</h3>
+      <div class="bg-block">
+        <div v-if="backgroundImage" class="bg-thumb" :style="{ backgroundImage: `url(${backgroundImage})` }"></div>
+        <p v-else class="bg-empty">未设置，使用纯色背景</p>
+        <div class="bg-actions">
+          <button type="button" class="ghost" @click="pickImage">选择图片</button>
+          <button v-if="backgroundImage" type="button" class="ghost danger-text" @click="clearImage">清除</button>
+        </div>
+        <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
       </div>
     </div>
   </div>
