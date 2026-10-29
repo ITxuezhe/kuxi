@@ -132,7 +132,7 @@ export class MysqlDriver implements IDriver {
       // column_type 带 full 定义（varchar(255) / enum('a','b') / int unsigned），
       // data_type 是裸类型名（varchar）——重建表时丢长度会直接 1064
       const cols = await this.query(
-        `SELECT column_name, column_type, column_extra, is_nullable, column_key, column_default
+        `SELECT column_name, column_type, EXTRA AS column_extra, is_nullable, column_key, column_default
          FROM information_schema.columns WHERE table_schema = ? AND table_name = ?`,
         [this.config.database, name],
       );
