@@ -216,9 +216,8 @@ function registerIpc(): void {
         await manager.disconnect(id);
         try {
           await manager.connect(toConfig(updated), id);
-        } catch (e) {
+        } catch {
           // 重连失败不阻断保存（配置已更新），下次连接会用新配置
-          console.warn('更新连接后重连失败:', normalizeError(e).message);
         }
       }
       return { id };
