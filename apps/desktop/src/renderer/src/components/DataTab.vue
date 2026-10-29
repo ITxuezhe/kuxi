@@ -54,6 +54,14 @@ function onSort(col: string, next: 'asc' | 'desc' | ''): void {
   sortState.value = next ? { col, dir: next } : null;
   wb.sortGrid(props.tab, col, next);
 }
+
+/** 用 SQL 查当前表：新开查询标签并填入 SELECT 模板（不自动执行，确认后再跑） */
+function queryWithSql(): void {
+  const t = props.tab.table;
+  if (!t) return;
+  const ident = wb.currentDbType.value === 'mysql' ? `\`${t}\`` : `"${t}"`;
+  wb.openQuery(`SELECT * FROM ${ident} LIMIT 200;`);
+}
 </script>
 
 <template>
@@ -82,6 +90,15 @@ function onSort(col: string, next: 'asc' | 'desc' | ''): void {
       >
         <BaseIcon name="edit" :size="14" />
         <span>设计此表</span>
+      </button>
+      <button
+        class="ghost icon-lead"
+        type="button"
+        title="打开查询标签并生成该表的 SELECT 模板，改写后执行"
+        @click="queryWithSql"
+      >
+        <BaseIcon name="search" :size="14" />
+        <span>SQL 查询</span>
       </button>
       <span class="filter-box">
         <BaseIcon name="search" :size="13" />

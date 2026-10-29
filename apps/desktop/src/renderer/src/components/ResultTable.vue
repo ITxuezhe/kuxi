@@ -199,6 +199,8 @@ const matchedCount = computed<number>(() => displayRows.value.length);
 
 /** 冻结第一数据列（行号列始终冻结由 CSS 保证）；横向滚动时常驻可见 */
 const freezeFirst = ref<boolean>(true);
+/** 冻结首行（表头吸顶）开关：默认开，纵向滚动时表头常驻 */
+const freezeHead = ref<boolean>(true);
 
 /** 列宽（px），键为列名；未设置的列按 CSS 自适应 */
 const colWidths = ref<Record<string, number>>({});
@@ -516,6 +518,38 @@ function rawToEdit(value: unknown): string {
   return String(value);
 }
 
+/** 日期时间族类型（DATE / DATETIME / TIMESTAMP / TIME）→ 编辑时用原生日期控件 */
+const DATE_TYPE_RE = /date|time/i;
+
+function isDateCol(col: string): boolean {
+  return DATE_TYPE_RE.test(props.columnTypes[col] ?? '');
+}
+
+/** 原生控件类型：DATETIME/TIMESTAMP → datetime-local，DATE → date，TIME → time */
+function dateInputType(col: string): 'date' | 'time' | 'datetime-local' {
+  const t = (props.columnTypes[col] ?? '').toLowerCase();
+  if (t.includes('datetime') || t.includes('timestamp')) return 'datetime-local';
+  if (t.startsWith('date')) return 'date';
+  return 'time';
+}
+
+/** DB 日期字符串 → 原生控件值（'2025-01-02 03:04:05' → '2025-01-02T03:04:05'；DATE 取前 10 位） */
+function rawToDateInput(col: string, value: unknown): string {
+  const s = rawToEdit(value);
+  if (!s) return '';
+  if (dateInputType(col) === 'date') return s.slice(0, 10);
+  return s.replace(' ', 'T');
+}
+
+/** 原生控件值 → DB 日期字符串（datetime-local 缺秒补 :00，'T' 还原为空格） */
+function dateInputToRaw(col: string, value: string): string {
+  if (!value) return '';
+  if (dateInputType(col) === 'date') return value;
+  let s = value.replace('T', ' ');
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) s += ':00';
+  return s;
+}
+
 /**
  * 双击单元格进入编辑态（Navicat 交互）。
  * @param rowIndex 行号
@@ -534,7 +568,9 @@ function startEdit(rowIndex: number, col: string, row: Record<string, unknown>):
   editing.value = { rowIndex, col };
   // 已暂存的修改优先作为编辑起点（重新编辑不丢暂存内容）
   const pending = stagedChange(rowIndex, col);
-  editValue.value = rawToEdit(pending ? (pending.setNull ? null : pending.newValue) : row[col]);
+  const raw = pending ? (pending.setNull ? null : pending.newValue) : row[col];
+  // 日期列：转成原生控件格式（'2025-01-02 03:04:05' → '2025-01-02T03:04:05'）
+  editValue.value = isDateCol(col) ? rawToDateInput(col, raw) : rawToEdit(raw);
   void nextTick(() => editInputRef.value?.select());
 }
 
@@ -542,13 +578,15 @@ function startEdit(rowIndex: number, col: string, row: Record<string, unknown>):
 function commitEdit(row: Record<string, unknown>): void {
   if (!editing.value) return;
   const { rowIndex, col } = editing.value;
-  const newValue = editValue.value;
+  const newValue = isDateCol(col) ? dateInputToRaw(col, editValue.value) : editValue.value;
   const oldValue = row[col];
   const pkValue = props.pkColumns.length ? row[props.pkColumns[0]] : undefined;
   editing.value = null;
-  // 与库里现值相同（且该处没有暂存 NULL 标记）→ 无需暂存
+  // 与库里现值相同（且该处没有暂存 NULL 标记）→ 无需暂存；
+  // 日期列两侧都按控件格式归一后再比，避免 '03:04' 与 '03:04:00' 的假差异
   const pending = stagedChange(rowIndex, col);
-  if (!pending?.setNull && rawToEdit(oldValue) === newValue) {
+  const oldNorm = isDateCol(col) ? dateInputToRaw(col, rawToDateInput(col, oldValue)) : rawToEdit(oldValue);
+  if (!pending?.setNull && oldNorm === newValue) {
     staged.value.delete(stagedKey(rowIndex, col));
     return;
   }
@@ -584,7 +622,9 @@ function saveDraft(): void {
   const values: Record<string, string> = {};
   for (const col of columns.value) {
     const raw = draft.value[col] ?? '';
-    if (raw.trim() !== '') values[col] = raw.trim();
+    // 日期列：原生控件值（'2025-01-02T03:04'）转回 DB 格式再交给 INSERT
+    const normalized = isDateCol(col) ? dateInputToRaw(col, raw) : raw;
+    if (normalized.trim() !== '') values[col] = normalized.trim();
   }
   if (!Object.keys(values).length) {
     toast.info('请先填写至少一个字段');
@@ -755,7 +795,7 @@ onMounted(async () => {
         </template>
         <span v-if="props.result.truncated" class="warn">（结果已按上限截断）</span>
         <span class="tip">
-          {{ props.editable ? '单击行看详情 · 双击改单格 · 底部可新增行' : '单击行看详情 · 右键复制/导出' }}
+          {{ props.editable ? '单击行看详情 · 双击或 Enter 编辑 · 底部可新增行' : '单击行看详情 · 右键复制/导出' }}
         </span>
         <button
           class="ghost freeze-toggle"
@@ -767,9 +807,19 @@ onMounted(async () => {
           <BaseIcon name="lock" :size="13" />
           <span>冻结首列</span>
         </button>
+        <button
+          class="ghost freeze-toggle"
+          type="button"
+          :class="{ 'is-on': freezeHead }"
+          title="冻结首行：纵向滚动时表头常驻可见"
+          @click="freezeHead = !freezeHead"
+        >
+          <BaseIcon name="lock" :size="13" />
+          <span>冻结首行</span>
+        </button>
       </div>
       <div class="data-body">
-      <div class="table-wrap">
+      <div class="table-wrap" :class="{ 'head-free': !freezeHead }">
         <table>
           <thead>
             <tr>
@@ -810,7 +860,7 @@ onMounted(async () => {
               :class="{ 'is-selected': selectedIndex === item.index }"
               @click="selectRow(item.index)"
             >
-              <td class="row-num">{{ item.index + 1 }}</td>
+              <td class="row-num" title="查看行详情">{{ item.index + 1 }}</td>
               <td
                 v-for="col in columns"
                 :key="col"
@@ -827,11 +877,13 @@ onMounted(async () => {
                   stagedChange(item.index, col)
                     ? '已修改（未提交）· 双击继续编辑'
                     : canEdit(col)
-                      ? '双击编辑 · 右键复制'
+                      ? '双击或 Enter 编辑 · 右键复制'
                       : '右键复制'
                 "
                 tabindex="0"
                 @dblclick="startEdit(item.index, col, item.row)"
+                @keydown.enter.prevent="canEdit(col) && startEdit(item.index, col, item.row)"
+                @keydown.f2.prevent="canEdit(col) && startEdit(item.index, col, item.row)"
                 @contextmenu="onCellContextMenu($event, item.row, item.index, col)"
               >
                 <input
@@ -839,6 +891,7 @@ onMounted(async () => {
                   ref="editInputRef"
                   v-model="editValue"
                   class="cell-input"
+                  :type="isDateCol(col) ? dateInputType(col) : 'text'"
                   aria-label="编辑单元格"
                   @keydown="onEditKeydown($event, item.row)"
                   @blur="commitEdit(item.row)"
@@ -857,6 +910,7 @@ onMounted(async () => {
                 <input
                   v-model="draft[col]"
                   class="cell-input draft-input"
+                  :type="isDateCol(col) ? dateInputType(col) : 'text'"
                   :aria-label="`新增行的 ${col} 列`"
                   :placeholder="col"
                   :disabled="props.inserting"

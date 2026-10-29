@@ -7,6 +7,7 @@
  * - 标题栏（title prop 走纯文本；带图标/标签的复杂标题用 #title 插槽）
  * - 遮罩点击关闭 / Esc 关闭（busy 时一律禁止，避免中途误关丢失操作）
  * - 打开时锁定背景滚动 + 焦点移入（#title 或首个 [data-autofocus] 或弹窗本身）
+ * - Tab 焦点圈定在弹窗内（WCAG 2.4.3）、关闭后焦点归还给打开前的元素
  * - 进出场过渡动画（淡入 + 轻微上移缩放，交互更"优雅"）
  *
  * 用法：
@@ -52,16 +53,50 @@ function requestClose(): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') requestClose();
+  if (event.key === 'Escape') {
+    requestClose();
+    return;
+  }
+  if (event.key === 'Tab') trapTab(event);
 }
 
-// 打开时：锁定背景滚动 + 把焦点移入弹窗（便于键盘 Esc 与读屏）
-// 关闭时：恢复滚动
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Tab 循环圈定在弹窗内：到达首/尾元素时回绕，防止焦点逃逸到底层页面 */
+function trapTab(event: KeyboardEvent): void {
+  const modal = maskRef.value?.querySelector<HTMLElement>('.modal');
+  if (!modal) return;
+  const focusables = Array.from(modal.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => el.offsetParent !== null,
+  );
+  if (focusables.length === 0) {
+    event.preventDefault();
+    return;
+  }
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const active = document.activeElement as HTMLElement | null;
+  if (event.shiftKey) {
+    if (active === first || !modal.contains(active)) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else if (active === last || !modal.contains(active)) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+// 打开时：锁定背景滚动 + 记住触发元素 + 把焦点移入弹窗（便于键盘 Esc 与读屏）
+// 关闭时：恢复滚动 + 把焦点归还给打开前的元素（WCAG 2.4.3 Focus Order）
+let lastFocusedBeforeOpen: HTMLElement | null = null;
 watch(
   () => props.open,
   (open: boolean) => {
     if (open) {
       document.body.style.overflow = 'hidden';
+      lastFocusedBeforeOpen = document.activeElement as HTMLElement | null;
       void nextTick(() => {
         const root = maskRef.value;
         if (!root) return;
@@ -72,6 +107,10 @@ watch(
       });
     } else {
       document.body.style.overflow = '';
+      if (lastFocusedBeforeOpen?.isConnected) {
+        lastFocusedBeforeOpen.focus();
+      }
+      lastFocusedBeforeOpen = null;
     }
   },
 );

@@ -14,6 +14,9 @@
  * 默认（兜底）变量 —— 等价于 dark 主题，避免 JS 执行前出现无样式闪烁
  * ------------------------------------------------------------------------- */
 :root {
+  /* UA 组件（原生控件/滚动条/日历弹层）默认按深色渲染，与兜底 dark 主题一致；
+     各主题块内单独覆盖，light 主题翻转为 light */
+  color-scheme: dark;
 
   /* 背景层级：最底 → 面板 → 面板内嵌块 → 悬浮/激活块 */
   --bg: #1b1d23;
@@ -54,6 +57,7 @@
  * 1) dark —— 深色（默认）
  * ------------------------------------------------------------------------- */
 html[data-theme='dark'] {
+  color-scheme: dark;
   --bg: #1b1d23;
   --panel: #23262e;
   --panel-2: #2a2e37;
@@ -82,6 +86,7 @@ html[data-theme='dark'] {
  * 2) light —— 浅色
  * ------------------------------------------------------------------------- */
 html[data-theme='light'] {
+  color-scheme: light;
   --bg: #f4f6f9;
   --panel: #ffffff;
   --panel-2: #f0f2f6;
@@ -110,6 +115,7 @@ html[data-theme='light'] {
  * 3) midnight —— 深蓝紫
  * ------------------------------------------------------------------------- */
 html[data-theme='midnight'] {
+  color-scheme: dark;
   --bg: #12101f;
   --panel: #1a1730;
   --panel-2: #221d3d;
@@ -138,6 +144,7 @@ html[data-theme='midnight'] {
  * 4) forest —— 深绿
  * ------------------------------------------------------------------------- */
 html[data-theme='forest'] {
+  color-scheme: dark;
   --bg: #0f1a14;
   --panel: #142219;
   --panel-2: #1a2d21;
@@ -163,28 +170,77 @@ html[data-theme='forest'] {
 }
 
 /* ---------------------------------------------------------------------------
+ * 区域表面默认值（未开背景图时与原样式完全一致，零回归）：
+ *   --bg-scrim     背景图氛围遮罩，默认透明（不开背景图 = 无遮罩）
+ *   --surface-side 侧栏次级表面，默认与面板一致
+ *   --surface-main 主工作区表面，默认透明（沿用 --bg）
+ *   --main-shadow  主工作区左向投影，默认无
+ * ------------------------------------------------------------------------- */
+html {
+  --bg-scrim: transparent;
+  --surface-side: var(--panel);
+  --surface-main: transparent;
+  --surface-sticky: var(--panel);
+  --main-shadow: none;
+  /* 吸顶/冻结单元格背景：默认与所在面板一致；开背景图时改为实色，
+     否则滚动内容会从半透明的表头/行号/冻结列下面透出来 */
+  --cell-sticky: var(--panel-2);
+  --cell-frozen: var(--panel);
+}
+
+/* ---------------------------------------------------------------------------
  * 背景图激活时：面板层半透明，背景图透出（仅设了背景图才生效，零回归）
  * 双属性选择器特异性高于单主题选择器，确保覆盖 --panel*
+ * 层级策略：主工作区 --surface-main 最实（0.94~0.95）→ 侧栏 --surface-side
+ * 次之（0.78）→ 遮罩 --bg-scrim 只做氛围（暗色压暗 / 亮色提白）
  * ------------------------------------------------------------------------- */
 html[data-theme='dark'][data-bg='on'] {
   --panel: rgba(35, 38, 46, 0.88);
   --panel-2: rgba(42, 46, 55, 0.88);
   --panel-3: rgba(51, 56, 68, 0.9);
+  --bg-scrim: rgba(0, 0, 0, 0.4);
+  --surface-side: rgba(35, 38, 46, 0.78);
+  --surface-main: rgba(35, 38, 46, 0.94);
+  --surface-sticky: #23262e;
+  --cell-sticky: #2a2e37;
+  --cell-frozen: #23262e;
+  --main-shadow: -16px 0 32px -18px rgba(0, 0, 0, 0.55);
 }
 html[data-theme='light'][data-bg='on'] {
   --panel: rgba(255, 255, 255, 0.88);
   --panel-2: rgba(240, 242, 246, 0.88);
   --panel-3: rgba(228, 232, 239, 0.9);
+  --bg-scrim: rgba(255, 255, 255, 0.5);
+  --surface-side: rgba(255, 255, 255, 0.78);
+  --surface-main: rgba(255, 255, 255, 0.95);
+  --surface-sticky: #ffffff;
+  --cell-sticky: #f0f2f6;
+  --cell-frozen: #ffffff;
+  --main-shadow: -16px 0 32px -18px rgba(15, 23, 42, 0.28);
 }
 html[data-theme='midnight'][data-bg='on'] {
   --panel: rgba(26, 23, 48, 0.88);
   --panel-2: rgba(34, 29, 61, 0.88);
   --panel-3: rgba(44, 36, 81, 0.9);
+  --bg-scrim: rgba(0, 0, 0, 0.4);
+  --surface-side: rgba(26, 23, 48, 0.78);
+  --surface-main: rgba(26, 23, 48, 0.94);
+  --surface-sticky: #1a1730;
+  --cell-sticky: #221d3d;
+  --cell-frozen: #1a1730;
+  --main-shadow: -16px 0 32px -18px rgba(0, 0, 0, 0.55);
 }
 html[data-theme='forest'][data-bg='on'] {
   --panel: rgba(20, 34, 25, 0.88);
   --panel-2: rgba(26, 45, 33, 0.88);
   --panel-3: rgba(34, 57, 43, 0.9);
+  --bg-scrim: rgba(0, 0, 0, 0.4);
+  --surface-side: rgba(20, 34, 25, 0.78);
+  --surface-main: rgba(20, 34, 25, 0.94);
+  --surface-sticky: #142219;
+  --cell-sticky: #1a2d21;
+  --cell-frozen: #142219;
+  --main-shadow: -16px 0 32px -18px rgba(0, 0, 0, 0.55);
 }
 
 /* ---------------------------------------------------------------------------

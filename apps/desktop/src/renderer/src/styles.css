@@ -29,6 +29,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ---------- 动效无障碍（WCAG 2.3.3）：尊重系统"减弱动态效果" ----------
+   全局把过渡/动画压到近乎即时，无限动画（spin、骨架屏脉冲）停止循环；
+   透明度/颜色变化本身保留（0.01ms 完成），状态切换仍可感知，只是不再"动" */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ---------- 滚动条（跟随主题，避免浅色主题下仍是深色滚动条） ---------- */
 ::-webkit-scrollbar {
   width: 10px;
@@ -189,12 +203,13 @@ textarea:disabled {
   background-size: cover;
   background-position: center;
 }
-/* 背景图激活时的暗化遮罩：降低背景图干扰、保证面板文字可读（仅作氛围，不挡交互） */
+/* 背景图激活时的氛围遮罩：主题自适应（暗色压暗 / 亮色提白），
+   未开背景图时 --bg-scrim 为透明、完全不生效，不挡交互 */
 .app::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--bg-scrim, transparent);
   z-index: 0;
   pointer-events: none;
 }
@@ -213,6 +228,9 @@ textarea:disabled {
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   flex-shrink: 0;
+  /* 高于 .layout 等 .app 子级（z-index:1），保证顶栏内的浮层（外观设置 z-40）
+     不被主内容盖住；仍低于 toast(100)/modal(200)/ctx-menu(300) */
+  z-index: 30;
 }
 .brand {
   display: flex;
@@ -301,8 +319,11 @@ textarea:disabled {
   width: var(--sidebar-width);
   flex-shrink: 0;
   border-right: 1px solid var(--border);
-  background: var(--panel);
-  padding: var(--pad-panel);
+  /* 次级表面：开背景图时比主工作区更透（--surface-side），让中间区成为视觉主体 */
+  background: var(--surface-side);
+  /* 自身不留 padding：吸顶头要全宽覆盖滚动内容，水平留白由各直接子元素
+     （.sidebar-sticky / .conn-list / .schema）自管，避免负边距技巧算错压住卡片 */
+  padding: 0;
   overflow-y: auto;
 }
 .sidebar h2 {
@@ -330,6 +351,9 @@ textarea:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--gap-xs);
+  /* .sidebar 零 padding 后由本容器补回水平留白；顶部同档留白与吸顶头分隔，
+     否则首张卡片/空状态虚线框会直接贴住吸顶头底部分隔线 */
+  padding: var(--pad-panel) var(--pad-panel) 0;
 }
 .conn-item {
   display: flex;
@@ -690,6 +714,10 @@ textarea:disabled {
   padding: var(--pad-panel);
   gap: var(--gap);
   min-width: 0;
+  /* 主工作区表面：开背景图时近乎实色（--surface-main），层级最高、最亮；
+     并以左向投影与侧栏拉开层次（未开背景图时为 transparent/none，零回归） */
+  background: var(--surface-main);
+  box-shadow: var(--main-shadow, none);
 }
 
 /* ---------- SQL 编辑器 ---------- */
@@ -833,7 +861,7 @@ td {
   text-overflow: ellipsis;
 }
 th {
-  background: var(--panel-2);
+  background: var(--cell-sticky);
   position: sticky;
   top: 0;
   /* 表头层级必须高于所有 body 单元格（含冻结列 td.z1/z2），
@@ -906,11 +934,11 @@ td.col-frozen {
   position: sticky;
   left: 44px;
   z-index: 1;
-  background: var(--panel);
+  background: var(--cell-frozen);
 }
 th.col-frozen {
   z-index: 6;
-  background: var(--panel-2);
+  background: var(--cell-sticky);
 }
 tbody tr:hover td.col-frozen {
   background: var(--primary-soft);
@@ -922,10 +950,15 @@ tbody tr:hover td.col-frozen {
   align-items: center;
   gap: 4px;
   margin-left: auto;
+  flex-shrink: 0;
+}
+.freeze-toggle + .freeze-toggle {
+  margin-left: 6px;
 }
 .freeze-toggle.is-on {
   border-color: var(--primary);
   color: var(--text);
+  background: var(--primary-soft);
 }
 .freeze-toggle.is-on .base-icon {
   color: var(--primary);
@@ -940,13 +973,19 @@ td.cell-staged {
 
 /* 暂存操作条：批量提交 / 放弃 */
 .staged-bar {
+  position: relative;
+  z-index: 3;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
   padding: 6px var(--gap-sm);
   border-top: 1px solid var(--warn);
-  background: var(--warn-soft);
+  /* 用 color-mix 把琥珀强调色混入面板色：无背景图时为实色条，
+     开启背景图时（面板变半透明）仍保持约 0.9 不透明，底色不丢失、背景图不透出 */
+  background: color-mix(in srgb, var(--warn) 16%, var(--panel));
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
 }
 .staged-tip {
   display: inline-flex;
@@ -985,7 +1024,7 @@ td.row-num {
   width: 44px;
   text-align: right;
   color: var(--muted);
-  background: var(--panel-2);
+  background: var(--cell-sticky);
   font-variant-numeric: tabular-nums;
   cursor: default;
   user-select: none;
@@ -998,6 +1037,10 @@ tbody tr:hover td {
 }
 tbody tr:hover td.row-num {
   background: var(--panel-3);
+}
+/* 冻结首行关闭：表头随内容一起滚动 */
+.table-wrap.head-free thead th {
+  position: static;
 }
 td.cell {
   cursor: default;
@@ -1105,17 +1148,18 @@ tbody tr.data-row.is-selected td:first-child {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 6px;
+  padding: 8px 6px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 2px 6px;
+  grid-template-columns: 1fr;
+  gap: 2px;
 }
 .rd-item {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
   min-width: 0;
-  padding: 4px 8px;
+  padding: 6px 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1125,18 +1169,22 @@ tbody tr.data-row.is-selected td:first-child {
 }
 .rd-item:hover {
   border-color: var(--border);
-  background: var(--panel);
+  background: var(--panel-3);
 }
 .rd-key {
   flex-shrink: 0;
   color: var(--muted);
+  font-size: 11px;
 }
 .rd-val {
-  flex: 1;
   min-width: 0;
+  /* 长值换行展示，最多 3 行截断（点击复制完整值） */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-all;
+  line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
 .rd-val.is-null {
@@ -1175,6 +1223,8 @@ tbody tr.draft-row td:first-child {
   background: var(--panel);
 }
 .draft-bar {
+  position: relative;
+  z-index: 3;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -1182,6 +1232,8 @@ tbody tr.draft-row td:first-child {
   padding: 6px var(--ctrl-px);
   border-top: 1px solid var(--border);
   background: var(--panel);
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
   font-size: var(--font-sm);
   color: var(--muted);
 }
@@ -1822,7 +1874,8 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- 表结构浏览 ---------- */
 .schema {
-  margin-top: 16px;
+  /* 水平/底部留白从 .sidebar 迁移至此（margin 保持分隔线内缩的原观感） */
+  margin: 16px var(--pad-panel) var(--pad-panel);
   padding-top: 12px;
   border-top: 1px solid var(--border);
   display: flex;
@@ -2124,12 +2177,8 @@ button.danger:hover:not(:disabled) {
   font-size: 11px;
   white-space: nowrap;
 }
-/* 原生日期/时间控件跟随应用主题（深色下日历、时钟图标才可见） */
-input[type='date'],
-input[type='datetime-local'],
-input[type='time'] {
-  color-scheme: dark light;
-}
+/* 原生日期/时间控件、滚动条等 UA 组件的明暗由全局 color-scheme
+   （themes.css 按主题声明 dark/light 并继承）统一驱动，无需在此单独设置 */
 .field-grid.head {
   font-size: var(--font-sm);
   color: var(--muted);
@@ -2204,17 +2253,22 @@ input[type='time'] {
 /* ============================================================================
  * P2 连接管理重设计：侧栏头部 / 搜索 / 类型徽标 / 连接弹窗
  * ========================================================================== */
-.sidebar-head {
+.sidebar-sticky {
   position: sticky;
   top: 0;
   z-index: 5;
+  /* .sidebar 零 padding，本元素天然全宽；自带水平留白，无需负边距外扩 */
+  padding: var(--pad-panel) var(--pad-panel) 8px;
+  /* 吸顶头必须不透明（--surface-sticky）：半透明会让滑过的连接卡片叠影透出、
+     视觉上像被压切；底部投影让它读作悬浮层 */
+  background: var(--surface-sticky);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 14px -12px rgba(0, 0, 0, 0.4);
+}
+.sidebar-head {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: var(--gap-sm);
-  padding-bottom: 8px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
 }
 .sidebar-head h2 {
   margin: 0;
@@ -2239,7 +2293,6 @@ input[type='time'] {
   width: 100%;
   box-sizing: border-box;
   font-size: var(--font-sm);
-  margin-bottom: var(--gap-sm);
 }
 .type-badge {
   width: 24px;

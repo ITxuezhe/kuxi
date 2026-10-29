@@ -503,6 +503,15 @@ function onCancelExecute(): void {
 }
 
 onMounted(async () => {
+  // 桌面桥接缺失（Electron preload 未加载 / 在纯浏览器里打开渲染页）时，
+  // 所有 IPC 调用都会报 "Cannot read properties of undefined"，
+  // 这里一次性给出可行动的提示并跳过初始化，避免连环报错刷屏
+  if (!window.kuxi) {
+    toast.error(
+      '桌面桥接未加载：若在浏览器预览页打开，此功能仅桌面端可用；若在 Electron 中，请完全重启 pnpm dev（preload 构建缺失）后重试',
+    );
+    return;
+  }
   void refresh();
   try {
     const settings = await window.kuxi.getSettings();
@@ -573,6 +582,7 @@ onMounted(async () => {
 
     <div class="layout">
       <aside class="sidebar">
+        <div class="sidebar-sticky">
         <div class="sidebar-head">
           <h2>
             <span>连接</span>
@@ -631,6 +641,7 @@ onMounted(async () => {
           placeholder="搜索连接…"
           aria-label="搜索连接"
         />
+        </div><!-- /sidebar-sticky -->
 
         <div class="conn-list">
           <div
