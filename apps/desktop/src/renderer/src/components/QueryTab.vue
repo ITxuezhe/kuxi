@@ -19,11 +19,13 @@ const { ready: aiReady } = useAi();
       v-model="tab.sql"
       :running="tab.running"
       :ai-ready="aiReady"
+      :error-text="tab.error ?? ''"
       @execute="() => wb.run(tab, tab.sql)"
       @execute-selection="(text: string) => wb.run(tab, text)"
       @format="(p: { text: string; start: number; end: number }) => wb.format(tab, p)"
       @optimize="(p: { text: string; start: number; end: number }) => wb.optimize(tab, p)"
       @explain="(text: string) => wb.explain(text)"
+      @fix="(p: { text: string; start: number; end: number; error: string }) => wb.fix(tab, p)"
     />
     <ResultTable
       :result="tab.result"

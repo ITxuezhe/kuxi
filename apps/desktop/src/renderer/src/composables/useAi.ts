@@ -208,6 +208,34 @@ export async function explainSql(sql: string, dialect: string): Promise<string> 
   return askAi(system, sql);
 }
 
+/**
+ * 根据报错信息修正一条 SQL（报错一键修正）。
+ *
+ * 与 optimizeSql 的区别：输入多带一份执行报错，模型优先定位并修复导致
+ * 报错的问题，而不是泛化地"写得更好"。
+ * @param sql 报错的 SQL
+ * @param error 执行返回的错误信息
+ * @param dialect 方言名
+ * @param schemaText 可选：结构文本，帮助模型判断字段/类型
+ */
+export async function fixSql(
+  sql: string,
+  error: string,
+  dialect: string,
+  schemaText?: string,
+): Promise<string> {
+  const system = [
+    `你是数据库专家，负责根据用户提供的报错信息修正一条 ${dialect} SQL。`,
+    '要求：',
+    '1. 只输出修正后的 SQL，放在 ```sql 代码块中，不要输出解释。',
+    '2. 保持原查询意图不变，仅修复导致报错的问题。',
+    '3. 若无法从报错判断原因，原样返回，并在 SQL 前用一行注释说明疑点。',
+    schemaText ? `\n数据库结构：\n${schemaText}` : '',
+  ].join('\n');
+  const content = await askAi(system, `原始 SQL：\n${sql}\n\n报错信息：\n${error}`);
+  return extractSql(content);
+}
+
 /** 渲染进程侧使用 AI 配置 */
 export function useAi(): {
   config: Readonly<Ref<AiConfigPublic | null>>;

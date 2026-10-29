@@ -31,10 +31,11 @@ const editorHeight = ref<number>(loadEditorHeight());
  * 关键交互：
  * - ⌘/Ctrl + Enter 执行（Monaco 命令）
  * - 自定义右键菜单（禁用 Monaco 原生 contextmenu，复用应用统一的 DOM 菜单）
- * - 选区感知：执行选中 / 格式化 / AI 优化 / AI 解释都按"选区优先，否则全文"
+ * - 选区感知：执行选中 / 格式化 / AI 优化 / AI 解释 / AI 修复都按"选区优先，否则全文"
  * - 主题与字号跟随 useTheme，零硬编码颜色
  * - 空态提示用 Monaco 原生 placeholder（不再用 DOM 覆盖层，杜绝重叠）
  * - 底部分隔条可拖拽调高度（持久化，所有标签同步）
+ * - 底部工具栏提供可见的 AI 入口（解释 / 优化 / 修复），与右键菜单功能一致
  */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { monaco, applyMonacoTheme } from '../monaco-setup';
@@ -48,8 +49,10 @@ const props = withDefaults(
     running?: boolean;
     /** AI 相关菜单是否可用（未配置 AI 时置灰） */
     aiReady?: boolean;
+    /** 最近一次执行报错，作为 AI 修复的上下文；为空时禁用修复 */
+    errorText?: string;
   }>(),
-  { running: false, aiReady: false },
+  { running: false, aiReady: false, errorText: '' },
 );
 
 const emit = defineEmits<{
@@ -63,6 +66,8 @@ const emit = defineEmits<{
   optimize: [payload: { text: string; start: number; end: number }];
   /** 请求 AI 解释 */
   explain: [text: string];
+  /** 请求 AI 修复（携带最近报错） */
+  fix: [payload: { text: string; start: number; end: number; error: string }];
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -97,6 +102,21 @@ function getSelectionRange(): { text: string; start: number; end: number } {
   return { text: full, start: 0, end: full.length };
 }
 
+/** 工具栏 / 右键共用的 AI 入口：取选区或全文后上抛 */
+function onExplain(): void {
+  const { text } = getSelectionRange();
+  emit('explain', text);
+}
+function onOptimize(): void {
+  const { text, start, end } = getSelectionRange();
+  emit('optimize', { text, start, end });
+}
+function onFix(): void {
+  if (!props.errorText) return;
+  const { text, start, end } = getSelectionRange();
+  emit('fix', { text, start, end, error: props.errorText });
+}
+
 /** 弹自定义右键菜单 */
 function showMenu(event: MouseEvent): void {
   const { text, start, end } = getSelectionRange();
@@ -118,6 +138,12 @@ function showMenu(event: MouseEvent): void {
       disabled: !props.aiReady,
       hint: props.aiReady ? undefined : '未配置',
       action: () => emit('explain', text),
+    },
+    {
+      label: 'AI 修复',
+      disabled: !props.aiReady || !props.errorText,
+      hint: props.aiReady ? (props.errorText ? undefined : '需先报错') : '未配置',
+      action: () => onFix(),
     },
   ]);
 }
@@ -270,7 +296,15 @@ onBeforeUnmount(() => {
       </span>
       <span v-if="props.running" style="color: var(--muted)">执行中，编辑已临时锁定…</span>
       <span class="spacer"></span>
-      <span class="editor-foot-tip">右键：格式化 / AI 优化 / AI 解释</span>
+      <button type="button" class="link" :disabled="!aiReady" @click="onExplain">AI 解释</button>
+      <button type="button" class="link" :disabled="!aiReady" @click="onOptimize">AI 优化</button>
+      <button
+        type="button"
+        class="link"
+        :disabled="!aiReady || !errorText"
+        :title="errorText ? '根据最近一次报错修正 SQL' : '需先执行并出现报错'"
+        @click="onFix"
+      >AI 修复</button>
       <span>{{ modelValue.length }} 字符</span>
     </div>
   </div>

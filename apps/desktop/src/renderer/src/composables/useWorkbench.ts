@@ -23,7 +23,7 @@ import {
   generateUpdate,
   stripSqlOrder,
 } from '../utils/sql';
-import { buildSchemaText, dialectOf, explainSql, optimizeSql } from '../composables/useAi';
+import { buildSchemaText, dialectOf, explainSql, fixSql, optimizeSql } from '../composables/useAi';
 import { formatSql } from '../utils/sql';
 import { useToast } from '../composables/useToast';
 
@@ -525,6 +525,26 @@ export function useWorkbench() {
     }
   }
 
+  async function fix(
+    tab: WorkbenchTab,
+    payload: { text: string; start: number; end: number; error: string },
+  ): Promise<void> {
+    try {
+      toast.info('AI 正在修正…');
+      const schema = await schemaText();
+      const fixed = await fixSql(
+        payload.text,
+        payload.error,
+        dialectOf(currentDbType.value),
+        schema,
+      );
+      replaceRange(tab, payload.start, payload.end, fixed);
+      toast.success('已替换为修正后的 SQL');
+    } catch (e) {
+      toast.error(`修正失败：${(e as Error).message}`);
+    }
+  }
+
   return {
     // 状态
     tabs,
@@ -562,5 +582,6 @@ export function useWorkbench() {
     format,
     optimize,
     explain,
+    fix,
   };
 }
