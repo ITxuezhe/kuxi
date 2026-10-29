@@ -7,12 +7,15 @@
  * 3. 根据应用 4 套主题精确色值定义对应的 Monaco 主题，并与 useTheme 联动切换。
  *
  * 设计决策：
- * - 全量引入 monaco-editor（本地优先应用，体积不是问题，且避免手动拼语言包出错）。
+ * - 只引入 Monaco 的「裸编辑器内核」(editor.api) + SQL 一种基础语言，避免把
+ *   TS/JSON/CSS/HTML 等全部语言服务打进包（全量 monaco-editor 会让主包膨胀到 ~8MB）。
+ *   我们的编辑器只用 sql 一种语言，按需引入即可；新增语言时在此补一行 contribution。
  * - 主题色全部取自 themes.css，保证编辑器与整个应用换肤一致，零硬编码颜色。
  * - getWorker 只返回 editorWorker，避免其它语言 worker 被错误拉起（我们只用 sql）。
  */
 /// <reference types="vite/client" />
-import * as monaco from 'monaco-editor';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution';
 import 'monaco-editor/min/vs/editor/editor.main.css';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import type { ThemeName } from './composables/useTheme';
