@@ -312,6 +312,7 @@ function onCellContextMenu(
   openContextMenu(event, [
     { label: '复制单元格', action: () => void copyCell(row, col) },
     { label: '复制整行', action: () => void copyRow(row) },
+    { label: '复制为新行', action: () => void duplicateRow(row) },
     ...copyAsItems,
     ...editItems,
     ...exportItems,
@@ -414,6 +415,34 @@ async function copyRow(row: Record<string, unknown>): Promise<void> {
   const ok = await copy(line);
   if (ok) toast.success('已复制整行');
   else toast.error('复制失败');
+}
+
+/**
+ * 复制某条记录为新行（DataGrip 式 Ctrl+D）：把副本各列值填入新增行草稿，
+ * 用户改主键后即可保存，等于"基于副本新增一条数据"，而非仅复制内容到剪贴板。
+ * @param row 被复制的记录
+ */
+function duplicateRow(row: Record<string, unknown>): void {
+  if (!props.editable) {
+    toast.info('当前结果不可编辑，无法基于副本新增');
+    return;
+  }
+  const next: Record<string, string> = {};
+  for (const col of columns.value) {
+    const value = row[col];
+    // NULL / undefined → 空串（保存时按"不写"处理，沿用默认 / NULL），与原值保持一致语义
+    next[col] = value === null || value === undefined ? '' : String(value);
+  }
+  draft.value = next;
+  focusDraftAfterInsert.value = false;
+  void nextTick(() => {
+    const input = draftRowEl.value?.querySelector<HTMLInputElement>('.draft-input');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  });
+  toast.success('已复制为新行，修改后保存即可');
 }
 
 /** 统一复制：成功/失败提示 */
@@ -739,6 +768,7 @@ onMounted(async () => {
           <span>冻结首列</span>
         </button>
       </div>
+      <div class="data-body">
       <div class="table-wrap">
         <table>
           <thead>
@@ -855,6 +885,15 @@ onMounted(async () => {
             <BaseIcon name="copy" :size="14" />
           </button>
           <button
+            class="rd-copy-new"
+            type="button"
+            title="复制为新行（基于该记录新增一条，可改主键后保存）"
+            aria-label="复制为新行"
+            @click="duplicateRow(selectedRow)"
+          >
+            复制为新行
+          </button>
+          <button
             class="icon-btn"
             type="button"
             title="关闭详情"
@@ -883,6 +922,7 @@ onMounted(async () => {
           </button>
         </div>
       </div>
+      </div><!-- /data-body -->
 
       <!-- 暂存操作条：有未提交修改时出现（TablePlus 式批量提交/放弃） -->
       <div v-if="props.editable && stagedCount > 0" class="staged-bar">

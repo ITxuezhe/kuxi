@@ -561,12 +561,15 @@ textarea:disabled {
   margin-left: 2px;
 }
 .field-hint {
+  margin-top: 2px;
   color: var(--muted);
   font-size: var(--font-sm);
 }
 .field-error {
+  margin-top: 2px;
   color: var(--danger);
   font-size: var(--font-sm);
+  font-weight: 500;
 }
 .inline {
   display: flex;
@@ -587,11 +590,15 @@ textarea:disabled {
 }
 .actions {
   display: flex;
+  justify-content: flex-end;
   gap: var(--gap-sm);
-  margin-top: 2px;
+  margin-top: var(--gap-sm);
+  padding-top: var(--gap-sm);
+  border-top: 1px solid var(--border);
 }
 .actions button {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 88px;
 }
 .msg {
   font-size: var(--font-sm);
@@ -1037,15 +1044,26 @@ tbody tr.data-row.is-selected td:first-child {
 }
 
 /* ---------- 行详情面板 ---------- */
+.data-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  overflow: hidden;
+}
 .row-detail {
   flex-shrink: 0;
-  max-height: min(190px, 32vh);
+  width: 300px;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   background: var(--panel-2);
+  overflow: hidden;
 }
 .row-detail-head {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
@@ -1065,7 +1083,27 @@ tbody tr.data-row.is-selected td:first-child {
   margin-left: auto;
   opacity: 0.75;
 }
+.rd-copy-new {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--primary);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.rd-copy-new:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
 .row-detail-grid {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 6px;
   display: grid;
@@ -2167,10 +2205,16 @@ input[type='time'] {
  * P2 连接管理重设计：侧栏头部 / 搜索 / 类型徽标 / 连接弹窗
  * ========================================================================== */
 .sidebar-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-bottom: var(--gap-sm);
+  padding-bottom: 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
 }
 .sidebar-head h2 {
   margin: 0;
@@ -2211,7 +2255,7 @@ input[type='time'] {
   margin-top: 1px;
 }
 .conn-modal {
-  max-width: 560px;
+  width: min(560px, 92vw);
 }
 .confirm-message {
   margin: 0;
