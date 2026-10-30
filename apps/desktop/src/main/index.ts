@@ -27,6 +27,7 @@ import {
   type ExportOutcome,
   type ExportWithRequest,
   type IConnectionConfig,
+  type SshConfig,
 } from '@kuxi/shared';
 import {
   decryptSecret,
@@ -62,8 +63,32 @@ interface StoredConnection {
   user?: string;
   database?: string;
   ssl?: boolean;
+  /** SSH 隧道的非敏感字段（口令单独加密存） */
+  ssh?: {
+    enabled: boolean;
+    host?: string;
+    port?: number;
+    user?: string;
+    privateKeyPath?: string;
+  };
   /** 加密后的密码（enc:base64 或开发兜底 plain:base64） */
   passwordEnc?: string;
+  /** 加密后的 SSH 密码 */
+  sshPasswordEnc?: string;
+  /** 加密后的 SSH 私钥口令 */
+  sshPassphraseEnc?: string;
+}
+
+/** 只保留 SSH 的非敏感字段：口令一律走 encryptSecret 单独落盘 */
+function sshToStore(ssh?: SshConfig): StoredConnection['ssh'] {
+  if (!ssh) return undefined;
+  return {
+    enabled: ssh.enabled,
+    host: ssh.host,
+    port: ssh.port,
+    user: ssh.user,
+    privateKeyPath: ssh.privateKeyPath,
+  };
 }
 
 function readStore(): StoredConnection[] {
@@ -79,15 +104,22 @@ function getSettings(): AppSettings {
   return { ...DEFAULT_SETTINGS, ...readJson<Partial<AppSettings>>(SETTINGS_FILE, {}) };
 }
 
-/** 脱敏后返回给渲染进程（不含密码密文） */
+/** 脱敏后返回给渲染进程（不含任何密文，只给 hasXxx 布尔） */
 function toPublic(
   s: StoredConnection,
-): Omit<StoredConnection, 'passwordEnc'> & { hasPassword: boolean } {
-  const { passwordEnc, ...rest } = s;
-  return { ...rest, hasPassword: Boolean(passwordEnc) };
+): Omit<StoredConnection, 'passwordEnc' | 'sshPasswordEnc' | 'sshPassphraseEnc'> & {
+  hasPassword: boolean;
+  hasSshPassword: boolean;
+} {
+  const { passwordEnc, sshPasswordEnc, sshPassphraseEnc, ...rest } = s;
+  return {
+    ...rest,
+    hasPassword: Boolean(passwordEnc),
+    hasSshPassword: Boolean(sshPasswordEnc),
+  };
 }
 
-/** 把磁盘上的存储结构还原成可连接的配置（解密密码） */
+/** 把磁盘上的存储结构还原成可连接的配置（解密密码与 SSH 口令） */
 function toConfig(s: StoredConnection): IConnectionConfig {
   return {
     name: s.name,
@@ -99,6 +131,17 @@ function toConfig(s: StoredConnection): IConnectionConfig {
     password: decryptSecret(s.passwordEnc),
     database: s.database,
     ssl: s.ssl,
+    ssh: s.ssh
+      ? {
+          enabled: s.ssh.enabled,
+          host: s.ssh.host ?? '',
+          port: s.ssh.port,
+          user: s.ssh.user ?? '',
+          privateKeyPath: s.ssh.privateKeyPath,
+          password: decryptSecret(s.sshPasswordEnc),
+          passphrase: decryptSecret(s.sshPassphraseEnc),
+        }
+      : undefined,
   };
 }
 
@@ -165,7 +208,10 @@ function registerIpc(): void {
       user: config.user,
       database: config.database,
       ssl: config.ssl,
+      ssh: sshToStore(config.ssh),
       passwordEnc: encryptSecret(config.password),
+      sshPasswordEnc: encryptSecret(config.ssh?.password),
+      sshPassphraseEnc: encryptSecret(config.ssh?.passphrase),
     });
     writeStore(list);
     return { id: connId };
@@ -207,7 +253,15 @@ function registerIpc(): void {
         user: config.user,
         database: config.database,
         ssl: config.ssl,
+        ssh: sshToStore(config.ssh),
         passwordEnc: config.password ? encryptSecret(config.password) : existing.passwordEnc,
+        // SSH 口令留空同样保留原值（编辑时表单不回显口令）
+        sshPasswordEnc: config.ssh?.password
+          ? encryptSecret(config.ssh.password)
+          : existing.sshPasswordEnc,
+        sshPassphraseEnc: config.ssh?.passphrase
+          ? encryptSecret(config.ssh.passphrase)
+          : existing.sshPassphraseEnc,
       };
       list[idx] = updated;
       writeStore(list);
@@ -285,12 +339,19 @@ function registerIpc(): void {
     return manager.test(config);
   });
 
-  // 编辑模式下测试：密码留空时，用磁盘里已保存的密码补齐再测
+  // 编辑模式下测试：密码 / SSH 口令留空时，用磁盘里已保存的值补齐再测
   ipcMain.handle(IPC.TestExisting, async (_e, id: string, config: IConnectionConfig) => {
     const stored = readStore().find((s) => s.id === id);
     const merged: IConnectionConfig = { ...config };
     if (!merged.password && stored) {
       merged.password = decryptSecret(stored.passwordEnc);
+    }
+    if (merged.ssh && stored) {
+      merged.ssh = {
+        ...merged.ssh,
+        password: merged.ssh.password || decryptSecret(stored.sshPasswordEnc),
+        passphrase: merged.ssh.passphrase || decryptSecret(stored.sshPassphraseEnc),
+      };
     }
     return manager.test(merged);
   });
@@ -370,16 +431,26 @@ function registerIpc(): void {
       app: 'kuxi',
       version: 1,
       exportedAt: new Date().toISOString(),
-      connections: saved.map(({ name, type, filename, host, port, user, database, ssl, hasPassword }) => ({
-        name,
-        type,
-        filename,
-        host,
-        port,
-        user,
-        database,
-        ssl,
-        hasPassword,
+      connections: saved.map((s) => ({
+        name: s.name,
+        type: s.type,
+        filename: s.filename,
+        host: s.host,
+        port: s.port,
+        user: s.user,
+        database: s.database,
+        ssl: s.ssl,
+        ssh: s.ssh
+          ? {
+              enabled: s.ssh.enabled,
+              host: s.ssh.host ?? '',
+              port: s.ssh.port,
+              user: s.ssh.user ?? '',
+              privateKeyPath: s.ssh.privateKeyPath,
+              hasPassword: s.hasSshPassword,
+            }
+          : undefined,
+        hasPassword: s.hasPassword,
       })),
     };
     const { canceled, filePath } = await dialog.showSaveDialog({
@@ -436,6 +507,15 @@ function registerIpc(): void {
           user: c.user,
           database: c.database,
           ssl: c.ssl,
+          ssh: c.ssh
+            ? {
+                enabled: c.ssh.enabled,
+                host: c.ssh.host,
+                port: c.ssh.port,
+                user: c.ssh.user,
+                privateKeyPath: c.ssh.privateKeyPath,
+              }
+            : undefined,
           passwordEnc: undefined,
         });
         imported++;

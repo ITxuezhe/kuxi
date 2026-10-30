@@ -7,3 +7,8 @@ packages:
 allowBuilds:
   esbuild: true
   electron: true
+  # ssh2 的原生加速依赖（可选）：不编译也能用纯 JS 实现，避免引入 node-gyp/Electron 重编译
+  cpu-features: false
+  ssh2: false
+  # 仅 Squirrel/MSI 目标需要；本项目用 NSIS，不需要它的构建脚本
+  electron-winstaller: false

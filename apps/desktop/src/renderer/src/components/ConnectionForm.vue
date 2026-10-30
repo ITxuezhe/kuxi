@@ -38,7 +38,7 @@ const aiBusy = ref(false);
 const nlMsg = ref('');
 const nlMsgKind = ref<'' | 'ok' | 'err'>('');
 
-/** 表单字段（password 只在内存中，主进程负责加密落盘） */
+/** 表单字段（password / sshPassword 只在内存中，主进程负责加密落盘） */
 const form = reactive({
   type: 'sqlite' as DbType,
   name: '本地 SQLite',
@@ -48,6 +48,14 @@ const form = reactive({
   user: 'root',
   password: '',
   database: '',
+  // ---- SSH 隧道（跳板机 / 内网库） ----
+  sshEnabled: false,
+  sshHost: '',
+  sshPort: 22 as string | number,
+  sshUser: '',
+  sshPassword: '',
+  sshPrivateKeyPath: '',
+  sshPassphrase: '',
 });
 
 /** 记录字段是否被用户碰过：避免一进页面就满屏红字 */
@@ -58,6 +66,10 @@ const touched = reactive<Record<string, boolean>>({
   port: false,
   user: false,
   database: false,
+  sshHost: false,
+  sshPort: false,
+  sshUser: false,
+  sshAuth: false,
 });
 
 const portTouched = ref(false);
@@ -72,6 +84,10 @@ const isSqlite = computed<boolean>(() => form.type === 'sqlite');
 
 /** 编辑对象是否已保存过密码（用于展示「留空不修改」提示） */
 const hasSavedPassword = computed<boolean>(() => isEdit.value && Boolean(props.initial?.hasPassword));
+/** 编辑对象是否已保存过 SSH 密码 */
+const hasSavedSshPassword = computed<boolean>(
+  () => isEdit.value && Boolean(props.initial?.hasSshPassword),
+);
 
 /** 各字段错误文案 */
 const errors = computed<Record<string, string>>(() => {
@@ -82,12 +98,28 @@ const errors = computed<Record<string, string>>(() => {
     port: '',
     user: !isSqlite.value && !form.user.trim() ? '请填写用户名' : '',
     database: !isSqlite.value && !form.database.trim() ? '请填写数据库名' : '',
+    sshHost: '',
+    sshPort: '',
+    sshUser: '',
+    sshAuth: '',
   };
 
   if (!isSqlite.value) {
     const port = Number(form.port);
     if (!Number.isFinite(port) || port <= 0 || port > 65535) {
       result.port = '端口需在 1–65535 之间';
+    }
+    if (form.sshEnabled) {
+      if (!form.sshHost.trim()) result.sshHost = '请填写跳板机地址';
+      const sshPort = Number(form.sshPort);
+      if (!Number.isFinite(sshPort) || sshPort <= 0 || sshPort > 65535) {
+        result.sshPort = '端口需在 1–65535 之间';
+      }
+      if (!form.sshUser.trim()) result.sshUser = '请填写 SSH 用户名';
+      // 编辑时密码留空表示沿用已保存的密码，此时不算缺认证
+      if (!form.sshPrivateKeyPath.trim() && !form.sshPassword.trim() && !hasSavedSshPassword.value) {
+        result.sshAuth = '请填写 SSH 密码或私钥文件路径';
+      }
     }
   }
 
@@ -118,6 +150,14 @@ function hydrateFromInitial(): void {
   form.user = init.user ?? 'root';
   form.password = '';
   form.database = init.database ?? '';
+  form.sshEnabled = Boolean(init.ssh?.enabled);
+  form.sshHost = init.ssh?.host ?? '';
+  form.sshPort = init.ssh?.port ?? 22;
+  form.sshUser = init.ssh?.user ?? '';
+  form.sshPrivateKeyPath = init.ssh?.privateKeyPath ?? '';
+  // 口令不回显：留空即保留已保存的口令
+  form.sshPassword = '';
+  form.sshPassphrase = '';
   portTouched.value = false;
 }
 
@@ -149,7 +189,7 @@ function buildConfig(): IConnectionConfig {
   if (form.type === 'sqlite') {
     return { name, type: 'sqlite', filename: form.filename.trim() };
   }
-  return {
+  const config: IConnectionConfig = {
     name,
     type: form.type,
     host: form.host.trim(),
@@ -158,6 +198,19 @@ function buildConfig(): IConnectionConfig {
     password: form.password,
     database: form.database.trim(),
   };
+  if (form.sshEnabled) {
+    config.ssh = {
+      enabled: true,
+      host: form.sshHost.trim(),
+      port: Number(form.sshPort) || 22,
+      user: form.sshUser.trim(),
+      // 留空表示沿用已保存的口令（主进程负责保留）
+      password: form.sshPassword || undefined,
+      privateKeyPath: form.sshPrivateKeyPath.trim() || undefined,
+      passphrase: form.sshPassphrase || undefined,
+    };
+  }
+  return config;
 }
 
 /** 测试连接（编辑模式且密码留空时，用已保存密码补齐再测） */
@@ -467,6 +520,105 @@ async function onAiFill(): Promise<void> {
           <p v-if="showError('database')" id="conn-database-error" class="field-error">
             {{ errors.database }}
           </p>
+        </div>
+      </div>
+
+      <!-- SSH 隧道：数据库只允许内网/跳板机访问时使用 -->
+      <div class="ssh-block">
+        <label class="ssh-toggle">
+          <input v-model="form.sshEnabled" type="checkbox" />
+          <span>通过 SSH 隧道连接（跳板机 / 内网数据库）</span>
+        </label>
+
+        <div v-if="form.sshEnabled" class="ssh-body">
+          <div class="field-row">
+            <label for="ssh-host">跳板机<span class="req" aria-hidden="true">*</span></label>
+            <div>
+              <input
+                id="ssh-host"
+                v-model="form.sshHost"
+                type="text"
+                placeholder="例如 10.0.0.5 或 jump.example.com"
+                :aria-invalid="showError('sshHost')"
+                @blur="touch('sshHost')"
+              />
+              <p v-if="showError('sshHost')" class="field-error">{{ errors.sshHost }}</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label for="ssh-port">SSH 端口</label>
+            <div>
+              <input
+                id="ssh-port"
+                v-model.number="form.sshPort"
+                type="number"
+                min="1"
+                max="65535"
+                placeholder="22"
+                :aria-invalid="showError('sshPort')"
+                @blur="touch('sshPort')"
+              />
+              <p v-if="showError('sshPort')" class="field-error">{{ errors.sshPort }}</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label for="ssh-user">SSH 用户<span class="req" aria-hidden="true">*</span></label>
+            <div>
+              <input
+                id="ssh-user"
+                v-model="form.sshUser"
+                type="text"
+                autocomplete="off"
+                placeholder="例如 root / deploy"
+                :aria-invalid="showError('sshUser')"
+                @blur="touch('sshUser')"
+              />
+              <p v-if="showError('sshUser')" class="field-error">{{ errors.sshUser }}</p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label for="ssh-password">SSH 密码</label>
+            <input
+              id="ssh-password"
+              v-model="form.sshPassword"
+              type="password"
+              autocomplete="off"
+              :placeholder="hasSavedSshPassword ? '留空则不修改（已保存）' : '与私钥二选一'"
+              @blur="touch('sshAuth')"
+            />
+          </div>
+
+          <div class="field-row">
+            <label for="ssh-key">私钥文件</label>
+            <div>
+              <input
+                id="ssh-key"
+                v-model="form.sshPrivateKeyPath"
+                type="text"
+                placeholder="~/.ssh/id_ed25519"
+                @blur="touch('sshAuth')"
+              />
+              <p class="field-hint">
+                填写密码或私钥路径任意一种即可；私钥支持 ~/ 开头，口令加密的私钥请填下方口令
+              </p>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label for="ssh-passphrase">私钥口令</label>
+            <input
+              id="ssh-passphrase"
+              v-model="form.sshPassphrase"
+              type="password"
+              autocomplete="off"
+              placeholder="私钥未加密时可留空"
+            />
+          </div>
+
+          <p v-if="showError('sshAuth')" class="field-error">{{ errors.sshAuth }}</p>
         </div>
       </div>
     </template>

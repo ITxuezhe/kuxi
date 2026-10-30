@@ -90,6 +90,26 @@ SELECT 8, 3, 1, 2, 798.0, '已完成', '2024-06-25' WHERE NOT EXISTS (SELECT 1 F
 `;
 
 /**
+ * SSH 隧道配置。
+ * 数据库只允许内网/跳板机访问时，先 SSH 到跳板机，再从跳板机转发到数据库端口。
+ * password / passphrase 仅在 IPC 中明文传输一次，落盘由 Main 进程加密。
+ */
+export interface SshConfig {
+  enabled: boolean;
+  /** 跳板机地址 */
+  host: string;
+  /** 跳板机 SSH 端口，默认 22 */
+  port?: number;
+  user: string;
+  /** 密码认证（与私钥二选一） */
+  password?: string;
+  /** 私钥文件绝对路径（支持 ~ 开头） */
+  privateKeyPath?: string;
+  /** 私钥口令（私钥有加密时必填） */
+  passphrase?: string;
+}
+
+/**
  * 连接配置。
  * password 字段仅用于传输；落盘时由 Electron Main 进程加密，绝不下发到渲染进程。
  */
@@ -106,6 +126,8 @@ export interface IConnectionConfig {
   password?: string;
   database?: string;
   ssl?: boolean;
+  /** SSH 隧道（仅 mysql / postgres 生效） */
+  ssh?: SshConfig;
 }
 
 /** 统一查询结果结构（所有驱动归一化后返回此形状） */
@@ -451,6 +473,17 @@ export type ExportOutcome =
 // 连接配置的导入 / 导出（本地优先、可移植，不含密码密文）
 // ============================================================================
 
+/** 可移植的 SSH 配置：不含密码 / 私钥口令，导入后需用户补填 */
+export interface PortableSshConfig {
+  enabled: boolean;
+  host: string;
+  port?: number;
+  user: string;
+  privateKeyPath?: string;
+  /** 原连接是否存有 SSH 密码 */
+  hasPassword: boolean;
+}
+
 /** 可移植的连接配置：导出时不携带密码密文（safeStorage 密钥按本机绑定，跨机无法解密） */
 export interface PortableConnection {
   name: string;
@@ -461,6 +494,8 @@ export interface PortableConnection {
   user?: string;
   database?: string;
   ssl?: boolean;
+  /** SSH 隧道配置（不含任何口令） */
+  ssh?: PortableSshConfig;
   /** 原连接是否有密码：导入后用户需手动补填，UI 据此提示 */
   hasPassword: boolean;
 }

@@ -8,6 +8,7 @@ import type {
   TableInfo,
 } from '@kuxi/shared';
 import type { IDriver } from './base';
+import { openSshTunnel, type SshTunnel } from '../ssh-tunnel';
 
 /** 建连超时（ms） */
 const CONNECT_TIMEOUT_MS = 10_000;
@@ -25,22 +26,43 @@ const CONN_DEAD_RE =
 /** MySQL 驱动（基于 mysql2/promise，纯 JS，无需原生编译） */
 export class MysqlDriver implements IDriver {
   private conn: mysql.Connection | null = null;
+  /** SSH 隧道（仅 config.ssh.enabled 时存在，随连接一起关闭） */
+  private tunnel: SshTunnel | null = null;
   constructor(private readonly config: IConnectionConfig) {}
 
   async connect(): Promise<void> {
-    this.conn = await mysql.createConnection({
-      host: this.config.host,
-      port: this.config.port ?? 3306,
-      user: this.config.user,
-      password: this.config.password,
-      database: this.config.database,
-      ssl: this.config.ssl ? { rejectUnauthorized: false } : undefined,
-      multipleStatements: false,
-      connectTimeout: CONNECT_TIMEOUT_MS,
-      // TCP 保活：闲置连接不再被 NAT/防火墙静默掐断
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 10_000,
-    });
+    // 重连前先清掉旧连接与旧隧道，避免端口/隧道泄漏
+    await this.close();
+
+    let host = this.config.host;
+    let port = this.config.port ?? 3306;
+    if (this.config.ssh?.enabled) {
+      const tunnel = await openSshTunnel(this.config.ssh, host ?? '127.0.0.1', port);
+      this.tunnel = tunnel;
+      // 隧道已把目标库映射到本地回环端口，驱动只需连本地
+      host = '127.0.0.1';
+      port = tunnel.localPort;
+    }
+
+    try {
+      this.conn = await mysql.createConnection({
+        host,
+        port,
+        user: this.config.user,
+        password: this.config.password,
+        database: this.config.database,
+        ssl: this.config.ssl ? { rejectUnauthorized: false } : undefined,
+        multipleStatements: false,
+        connectTimeout: CONNECT_TIMEOUT_MS,
+        // TCP 保活：闲置连接不再被 NAT/防火墙静默掐断
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10_000,
+      });
+    } catch (e) {
+      // 建连失败不要把隧道留在后台
+      await this.close();
+      throw e;
+    }
   }
 
   isConnected(): boolean {
@@ -57,12 +79,17 @@ export class MysqlDriver implements IDriver {
   private killConn(): void {
     const conn = this.conn;
     this.conn = null;
-    if (!conn) return;
-    try {
-      (conn as unknown as { connection?: { destroy(): void } }).connection?.destroy();
-    } catch {
-      /* 套接字可能已死，忽略 */
+    if (conn) {
+      try {
+        (conn as unknown as { connection?: { destroy(): void } }).connection?.destroy();
+      } catch {
+        /* 套接字可能已死，忽略 */
+      }
     }
+    // 隧道随连接一起丢弃：下次查询自动重连时会重新建一条
+    const tunnel = this.tunnel;
+    this.tunnel = null;
+    if (tunnel) void tunnel.close();
   }
 
   /** 网络类错误时丢弃连接，让下一次查询自动重连 */
@@ -151,8 +178,18 @@ export class MysqlDriver implements IDriver {
 
   async close(): Promise<void> {
     if (this.conn) {
-      await this.conn.end();
+      const conn = this.conn;
       this.conn = null;
+      try {
+        await conn.end();
+      } catch {
+        /* 连接可能已被服务端掐断，关闭时忽略 */
+      }
+    }
+    if (this.tunnel) {
+      const tunnel = this.tunnel;
+      this.tunnel = null;
+      await tunnel.close();
     }
   }
 }

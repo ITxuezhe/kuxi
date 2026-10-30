@@ -613,6 +613,31 @@ textarea:disabled {
   border-color: var(--primary);
   color: var(--primary);
 }
+/* SSH 隧道：折叠区 */
+.ssh-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  padding: var(--gap-sm) var(--pad-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.ssh-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+.ssh-toggle > input {
+  margin: 0;
+}
+.ssh-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
 .actions {
   display: flex;
   justify-content: flex-end;

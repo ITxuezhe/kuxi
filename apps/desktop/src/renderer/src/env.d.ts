@@ -29,7 +29,17 @@ interface ConnectionItem {
   user?: string;
   database?: string;
   ssl?: boolean;
+  /** SSH 隧道的非敏感字段 */
+  ssh?: {
+    enabled: boolean;
+    host?: string;
+    port?: number;
+    user?: string;
+    privateKeyPath?: string;
+  };
   hasPassword: boolean;
+  /** 是否已保存 SSH 密码（编辑时留空 = 不修改） */
+  hasSshPassword: boolean;
   active: boolean;
 }
 

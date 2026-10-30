@@ -7,6 +7,7 @@ import type {
   TableInfo,
 } from '@kuxi/shared';
 import type { IDriver } from './base';
+import { openSshTunnel, type SshTunnel } from '../ssh-tunnel';
 
 /** 建连超时（ms） */
 const CONNECT_TIMEOUT_MS = 10_000;
@@ -20,12 +21,27 @@ const CONN_DEAD_RE =
 /** PostgreSQL 驱动（基于 pg，纯 JS） */
 export class PostgresDriver implements IDriver {
   private client: pg.Client | null = null;
+  /** SSH 隧道（仅 config.ssh.enabled 时存在，随连接一起关闭） */
+  private tunnel: SshTunnel | null = null;
   constructor(private readonly config: IConnectionConfig) {}
 
   async connect(): Promise<void> {
+    // 重连前先清掉旧连接与旧隧道，避免端口/隧道泄漏
+    await this.close();
+
+    let host = this.config.host;
+    let port = this.config.port ?? 5432;
+    if (this.config.ssh?.enabled) {
+      const tunnel = await openSshTunnel(this.config.ssh, host ?? '127.0.0.1', port);
+      this.tunnel = tunnel;
+      // 隧道已把目标库映射到本地回环端口，驱动只需连本地
+      host = '127.0.0.1';
+      port = tunnel.localPort;
+    }
+
     this.client = new pg.Client({
-      host: this.config.host,
-      port: this.config.port ?? 5432,
+      host,
+      port,
       user: this.config.user,
       password: this.config.password,
       database: this.config.database,
@@ -36,7 +52,23 @@ export class PostgresDriver implements IDriver {
       // TCP 保活：闲置连接不再被 NAT/防火墙静默掐断
       keepAlive: true,
     });
-    await this.client.connect();
+    try {
+      await this.client.connect();
+    } catch (e) {
+      // 建连失败不要把隧道留在后台
+      await this.close();
+      throw e;
+    }
+  }
+
+  /** 丢弃当前 client 与隧道（网络类故障后由下一次查询自动重连重建） */
+  private dropClient(): void {
+    const client = this.client;
+    this.client = null;
+    if (client) void client.end().catch(() => undefined);
+    const tunnel = this.tunnel;
+    this.tunnel = null;
+    if (tunnel) void tunnel.close();
   }
 
   isConnected(): boolean {
@@ -56,10 +88,10 @@ export class PostgresDriver implements IDriver {
     try {
       res = await client.query(sql, params);
     } catch (e) {
-      // 连接层故障时丢弃 client，下一次查询自动重连
+      // 连接层故障时丢弃 client（含 SSH 隧道），下一次查询自动重连
       const err = e as { message?: string };
       if (CONN_DEAD_RE.test(err?.message ?? '')) {
-        this.client = null;
+        this.dropClient();
       }
       throw e;
     }
@@ -110,8 +142,18 @@ export class PostgresDriver implements IDriver {
 
   async close(): Promise<void> {
     if (this.client) {
-      await this.client.end();
+      const client = this.client;
       this.client = null;
+      try {
+        await client.end();
+      } catch {
+        /* 连接可能已被服务端掐断，关闭时忽略 */
+      }
+    }
+    if (this.tunnel) {
+      const tunnel = this.tunnel;
+      this.tunnel = null;
+      await tunnel.close();
     }
   }
 }
