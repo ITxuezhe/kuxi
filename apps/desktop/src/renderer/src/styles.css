@@ -135,10 +135,11 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
-/* 复选框/单选框不吃通用输入框样式（width:100% 会把勾选框拉满整行） */
-input:not([type='checkbox']):not([type='radio']),
-select,
-textarea {
+/* 复选框/单选框不吃通用输入框样式（width:100% 会把勾选框拉满整行）；
+   Monaco 编辑器内部的输入控件也不吃（见下方 .monaco-editor 排除说明） */
+input:not([type='checkbox']):not([type='radio']):not(.monaco-editor *),
+select:not(.monaco-editor *),
+textarea:not(.monaco-editor *) {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border);
@@ -168,6 +169,22 @@ input[aria-invalid='true'] {
 textarea:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* Monaco 内部输入控件（textarea.ime-text-area / .inputarea）必须保持"隐形"：
+   它们由 Monaco 自己定位并靠透明 + z-index:-10 藏起来，一旦套上通用表单皮肤
+   （width:100% + 1px 边框 + 圆角），就会在编辑器首行画出一个多余的"假输入框"。
+   这里再兜一层，避免以后改上面的选择器时又把它带进来。 */
+.monaco-editor textarea,
+.monaco-editor input {
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 /* 按钮内 loading 小转圈 */
@@ -885,9 +902,74 @@ body.editor-resizing * {
   background: var(--panel-2);
   color: var(--muted);
   font-size: var(--font-sm);
+  /* 单行不折行：折行会把工具栏顶成两行，高度跳动 */
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .editor-foot .spacer {
   margin-left: auto;
+}
+/* 左侧快捷键提示：宽度不够时整体省略，优先保住右侧操作按钮 */
+.editor-foot .foot-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+.editor-foot .foot-running {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 操作按钮成组：与快捷键提示之间用竖线分隔，视觉上"左边说明、右边动作" */
+.editor-foot .foot-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--gap-sm);
+  border-left: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.editor-foot .foot-actions .link {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.editor-foot .foot-actions .link:hover:not(:disabled) {
+  background: var(--panel-3);
+}
+/* 字符数：等宽数字 + 右侧分隔线，避免数字跳动时把按钮挤来挤去 */
+.editor-foot .char-count {
+  flex-shrink: 0;
+  padding-left: var(--gap-sm);
+  border-left: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+/* 窄窗口：先牺牲快捷键提示，保留功能按钮 */
+@media (max-width: 900px) {
+  .editor-foot .foot-hint {
+    display: none;
+  }
+}
+/* 编辑器空态占位（Monaco placeholder 不生效时的兜底浮层） */
+.editor-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  /* 与 Monaco 的 padding.top 保持一致，占位文字才落在正文的基线上 */
+  padding: 12px 12px 0 4.4em;
+  color: var(--muted);
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0.75;
+  z-index: 2;
 }
 .kbd {
   display: inline-block;
@@ -954,8 +1036,10 @@ body.editor-resizing * {
   color: var(--warn);
 }
 .meta .tip {
-  margin-left: auto;
-  opacity: 0.8;
+  /* 提示紧跟统计信息：原来用 margin-left:auto 撑到中间，
+     会和右侧的开关组抢空间、按窗口宽度漂来漂去 */
+  margin-left: 0;
+  opacity: 0.72;
 }
 .table-wrap {
   flex: 1;
@@ -1002,6 +1086,8 @@ th {
   align-items: center;
   gap: 4px;
   color: var(--text);
+  /* 极轻字距：多列并排时列名之间更透气，又不破坏中文紧凑度 */
+  letter-spacing: 0.01em;
 }
 .th-pk {
   flex-shrink: 0;
@@ -1014,12 +1100,31 @@ th {
   line-height: 14px;
 }
 .th-type {
-  display: block;
-  margin-top: 1px;
+  /* 类型标注默认收起：单行表头更干净（类型信息在悬停提示与行详情里都有）。
+     需要时用工具条上的「列类型」开关打开 */
+  display: none;
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 11px;
+  /* 类型标注用等宽字体：与数据区的等宽数字同源，表头和数据落在同一条基线上 */
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 10px;
   font-weight: 400;
-  opacity: 0.85;
+  letter-spacing: 0.02em;
+  opacity: 0.72;
+}
+.result.show-col-types th .th-type {
+  display: block;
+}
+
+/* 数值列右对齐 + 等宽数字：金额/数量/ID 这类列纵向比大小才是一眼可辨 */
+th.is-num,
+td.is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+th.is-num .th-name {
+  width: 100%;
+  justify-content: flex-end;
 }
 /* 可排序列头：hover 提示可点 */
 th.sortable {
@@ -1081,23 +1186,43 @@ tbody tr:hover td.col-frozen {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
   flex-shrink: 0;
 }
-.freeze-toggle + .freeze-toggle {
-  margin-left: 6px;
+/* 「列类型」开关：默认关闭，打开后表头补一行类型标注 */
+.meta-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 4px;
 }
-.freeze-toggle.is-on {
+/* 开关组整体靠右：第一个开关用 auto 顶到最右，其余顺排 */
+.meta .freeze-toggle:first-of-type,
+.meta .meta-toggle:first-of-type {
+  margin-left: auto;
+}
+.freeze-toggle + .freeze-toggle,
+.meta-toggle + .meta-toggle {
+  margin-left: 4px;
+}
+.freeze-toggle.is-on,
+.meta-toggle.is-on {
   border-color: var(--primary);
   color: var(--text);
   background: var(--primary-soft);
 }
-.freeze-toggle.is-on .base-icon {
+.freeze-toggle.is-on .base-icon,
+.meta-toggle.is-on .base-icon {
   color: var(--primary);
 }
+/* 「图表」是动作、不是开关：与两个冻结开关留一档间隔，语义一眼可分 */
+.meta-action {
+  margin-left: 8px;
+}
 
-/* 暂存修改的单元格：琥珀色提醒（未写入数据库） */
-td.cell-staged {
+/* 暂存修改的单元格：琥珀色提醒（未写入数据库）。
+   选择器与斑马纹同特异性并在其后，保证"未提交的修改"不会被隔行底色盖掉 */
+tbody tr.data-row td.cell-staged {
   background: var(--warn-soft);
   box-shadow: inset 2px 0 0 var(--warn);
   font-weight: 600;
@@ -1158,16 +1283,25 @@ td.row-num {
   color: var(--muted);
   background: var(--cell-sticky);
   font-variant-numeric: tabular-nums;
+  /* 行号只是定位辅助，压到最弱一档，不与数据列争视线 */
+  font-size: var(--font-sm);
+  opacity: 0.75;
   cursor: default;
   user-select: none;
 }
 th.row-num {
   z-index: 6;
 }
-tbody tr:hover td {
+/* 斑马纹：极轻的隔行底色，长表格横向扫视不串行。
+   用 color-mix 叠透明度，不覆盖主题底色（开背景图时依然透出） */
+tbody tr.data-row:nth-child(even) td {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+/* hover 高亮：与斑马纹同特异性且写在后面，保证 hover 一定盖过斑马纹 */
+tbody tr.data-row:hover td {
   background: var(--primary-soft);
 }
-tbody tr:hover td.row-num {
+tbody tr.data-row:hover td.row-num {
   background: var(--panel-3);
 }
 /* 冻结首行关闭：表头随内容一起滚动 */
@@ -1183,7 +1317,7 @@ td.cell.editable {
 td.cell.editable:hover {
   background: var(--primary-soft);
 }
-td.cell:active {
+tbody tr.data-row td.cell:active {
   background: var(--panel-3);
 }
 /* 触屏长按判定期：高亮 + 内描边，让「按住即可编辑」有明确反馈 */
@@ -1234,11 +1368,15 @@ tbody tr.data-row.is-selected td:first-child {
 }
 .row-detail {
   flex-shrink: 0;
-  width: 300px;
+  /* 宽度随窗口自适应：固定 300px 在窄窗口会把表格挤成一条缝，
+     太宽又显得笨重 —— 用 clamp 在 220~340px 之间随视口缩放 */
+  width: clamp(220px, 30vw, 340px);
   align-self: stretch;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border);
+  /* 与表格分层：左侧一道投影，面板不再像"贴上去的贴纸" */
+  box-shadow: -10px 0 14px -10px rgba(0, 0, 0, 0.28);
   background: var(--panel-2);
   overflow: hidden;
 }
@@ -1247,21 +1385,40 @@ tbody tr.data-row.is-selected td:first-child {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  padding: 4px var(--ctrl-px);
+  padding: 6px var(--pad-card);
   border-bottom: 1px solid var(--border);
   font-size: var(--font-sm);
   color: var(--muted);
+  /* 标题与行号不折行：窄面板里竖排的"行详情"极其难看 */
+  white-space: nowrap;
 }
 .row-detail-head strong {
   color: var(--text);
   font-weight: 600;
+  flex-shrink: 0;
 }
 .rd-pos {
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 次级操作行：复制为新行 + 提示，与头部分行摆放 */
+.row-detail-sub {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  padding: 4px var(--pad-card);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-size: var(--font-sm);
 }
 .rd-hint {
   margin-left: auto;
-  opacity: 0.75;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rd-copy-new {
   flex-shrink: 0;
@@ -1285,18 +1442,20 @@ tbody tr.data-row.is-selected td:first-child {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 8px 6px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2px;
-}
-.rd-item {
+  padding: 4px var(--gap-xs);
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
+  gap: 1px;
+}
+/* 字段行改「单行两列」：字段名 | 值。
+   原来每项占两行，8 个字段就要 700px 高，滑起来很费劲 */
+.rd-item {
+  display: grid;
+  grid-template-columns: minmax(72px, 38%) 1fr;
+  align-items: baseline;
+  gap: var(--gap-sm);
   min-width: 0;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -1309,18 +1468,18 @@ tbody tr.data-row.is-selected td:first-child {
   background: var(--panel-3);
 }
 .rd-key {
-  flex-shrink: 0;
   color: var(--muted);
   font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rd-val {
   min-width: 0;
-  /* 长值换行展示，最多 3 行截断（点击复制完整值） */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  /* 单行省略 + title 全量：长 URL/长文本不再占三行高度 */
   overflow: hidden;
-  word-break: break-all;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
@@ -1621,6 +1780,17 @@ button.ghost.is-on {
 }
 
 /* ---------- 通用弹窗 ---------- */
+/* 弹窗尺寸体系：全站只允许这 4 档宽度。
+   任何弹窗通过 Modal 的 size 属性选档（sm/md/lg/xl），不要各自写 width，
+   否则窄窗口下会出现"有的弹窗留白 24px、有的贴边"的不一致。 */
+:root {
+  --modal-w-sm: 460px;
+  --modal-w-md: 620px;
+  --modal-w-lg: 820px;
+  --modal-w-xl: 940px;
+  /* 头尾常驻 + body 内部滚动，所以最大高度要留出上下呼吸空间 */
+  --modal-max-h: 86vh;
+}
 .modal-mask {
   position: fixed;
   inset: 0;
@@ -1634,10 +1804,11 @@ button.ghost.is-on {
   outline: none;
 }
 .modal {
-  width: 100%;
-  max-width: 560px;
-  max-height: 86vh;
-  overflow-y: auto;
+  /* calc 上限与遮罩 24px 内边距精确对应：窄窗口时两侧始终留足 24px */
+  width: min(var(--modal-w, var(--modal-w-md)), calc(100vw - 48px));
+  max-height: var(--modal-max-h);
+  /* 统一滚动策略：弹窗本身不滚，只有 .modal-body 滚 → 标题栏与底部按钮永远可见 */
+  overflow: hidden;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1646,6 +1817,19 @@ button.ghost.is-on {
   flex-direction: column;
   gap: var(--gap);
   outline: none;
+}
+/* 宽度档位（与 Modal.vue 的 size 属性一一对应） */
+.modal-sm {
+  --modal-w: var(--modal-w-sm);
+}
+.modal-md {
+  --modal-w: var(--modal-w-md);
+}
+.modal-lg {
+  --modal-w: var(--modal-w-lg);
+}
+.modal-xl {
+  --modal-w: var(--modal-w-xl);
 }
 /* 统一头部：标题 + 关闭 X */
 .modal-head {
@@ -1693,7 +1877,12 @@ button.ghost.is-on {
 }
 .modal-body {
   padding: var(--gap) var(--pad-panel);
+  /* 唯一的滚动容器：内容多少都不影响头尾位置 */
+  flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  /* 预留滚动条槽位：有无滚动条时内容宽度不跳变，卡片也不会被滚动条压住 */
+  scrollbar-gutter: stable;
 }
 .modal-foot {
   display: flex;
@@ -1736,10 +1925,14 @@ button.ghost.is-on {
   transform: translateY(8px) scale(0.98);
   opacity: 0;
 }
-/* 极窄窗口：遮罩内边距收窄，给弹窗内容让出宽度（24px 边距在小窗上占比过大） */
+/* 极窄窗口：遮罩内边距收窄，给弹窗内容让出宽度（24px 边距在小窗上占比过大）；
+   同时把四档宽度统一压成"满宽 - 24px"，避免小窗下反而出现窄弹窗 */
 @media (max-width: 560px) {
   .modal-mask {
     padding: 12px;
+  }
+  .modal {
+    --modal-w: calc(100vw - 24px);
   }
 }
 button.danger {
@@ -1756,7 +1949,7 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- 危险确认弹窗 ---------- */
 .danger-modal {
-  max-width: 620px;
+  /* 宽度交给 size 档位（默认 md），这里只强化危险语义 */
   border-color: var(--danger);
 }
 .danger-title {
@@ -1799,10 +1992,7 @@ button.danger:hover:not(:disabled) {
   color: var(--muted);
 }
 
-/* ---------- 设置类弹窗（AI 配置） ---------- */
-.settings-modal {
-  max-width: 600px;
-}
+/* ---------- 设置类弹窗（AI 配置）：宽度走 size="md" ---------- */
 .field {
   display: flex;
   flex-direction: column;
@@ -2324,17 +2514,8 @@ button.danger:hover:not(:disabled) {
 }
 
 /* ---------- 可视化建表 ---------- */
-/* 字段多时不把弹窗撑爆：弹窗自身不滚，表体独立滚动，底部按钮始终可见 */
-.designer-modal {
-  max-width: 900px;
-  max-height: 88vh;
-  overflow: hidden;
-}
-.designer-modal .modal-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
+/* 宽度与滚动策略全部由 .modal 统一提供（size="xl"），这里不再重复声明，
+   避免"别的弹窗改了 base、这个忘了改"的漂移 */
 .dialect-tag {
   margin-left: var(--gap-sm);
   font-size: var(--font-sm);
@@ -2559,17 +2740,8 @@ button.danger:hover:not(:disabled) {
   flex-shrink: 0;
   margin-top: 1px;
 }
-/* 连接弹窗比通用弹窗宽一档：三列字段/三张类型卡才不至于拥挤 */
-.conn-modal {
-  width: min(640px, calc(100vw - 48px));
-  max-width: min(640px, calc(100vw - 48px));
-  /* 由 .modal-body 单独滚动，弹窗本身不再滚动，头部与操作条常驻 */
-  overflow: hidden;
-}
+/* 连接弹窗：宽度走 size="md"，这里只保留"操作条常驻"的局部行为 */
 .conn-modal .modal-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   padding-bottom: 0;
 }
 /* 「测试连接 / 保存」吸附在滚动区底部：展开 SSH 等长表单时也不会被滚走 */
@@ -2586,11 +2758,7 @@ button.danger:hover:not(:disabled) {
   color: var(--text);
 }
 
-/* ---------- 可视化查询构建器 ---------- */
-.qb-modal {
-  /* 宽度上限与遮罩 24px 边距精确对应：窄窗口时两侧始终留足 24px */
-  width: min(860px, calc(100vw - 48px));
-}
+/* ---------- 可视化查询构建器（宽度走 size="lg"） ---------- */
 .qb {
   /* 双列网格：宽窗口下「筛选|排序」「分组|行数」并排，降低弹窗整体高度；
      通栏块（表单行/展示字段/SQL 预览/底部）用 .qb-span2，窄窗口回落单列 */
@@ -2763,17 +2931,7 @@ button.danger:hover:not(:disabled) {
   }
 }
 
-/* ---------- CSV / Excel 导入向导 ---------- */
-.import-modal {
-  width: min(900px, calc(100vw - 48px));
-  max-width: min(900px, calc(100vw - 48px));
-  overflow: hidden;
-}
-.import-modal .modal-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
+/* ---------- CSV / Excel 导入向导（宽度走 size="xl"） ---------- */
 .import-wizard {
   display: flex;
   flex-direction: column;
@@ -3153,9 +3311,7 @@ button.danger:hover:not(:disabled) {
   margin-top: 3px;
 }
 @media (max-width: 720px) {
-  .import-modal {
-    width: 96vw;
-  }
+  /* 宽度不再单独覆盖：.modal 的 560px 断点已统一压成满宽 */
   .import-summary {
     grid-template-columns: 1fr;
   }
@@ -3187,32 +3343,42 @@ button.danger:hover:not(:disabled) {
   flex-shrink: 0;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
-  /* 顶部留 4px 呼吸，标签不再顶死上边框 */
-  padding: 4px 8px 0;
+  gap: 3px;
+  /* 顶部留 6px 呼吸，标签不再顶死上边框 */
+  padding: 6px 8px 0;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   overflow-x: auto;
+  /* 多标签溢出时用细滚动条：默认 10px 滚动条会把标签顶高、基线错位 */
+  scrollbar-width: thin;
+}
+.tab-bar::-webkit-scrollbar {
+  height: 4px;
 }
 
+/* 标签：未选中 = 透明底 + 次级文字，靠 hover 变亮；
+   选中才升到内容面板色 + 顶部主色条 + 加深字重——三重信号，扫一眼就能定位 */
 .tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
   max-width: 200px;
-  padding: 6px 8px 6px 10px;
+  height: 30px;
+  padding: 0 8px 0 10px;
   border: 1px solid transparent;
   border-bottom: none;
-  border-radius: 6px 6px 0 0;
+  border-radius: 7px 7px 0 0;
   background: transparent;
   color: var(--muted);
   font-size: var(--font-sm);
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
-.tab:hover {
+.tab:hover:not(.active) {
   background: var(--panel-2);
   color: var(--text);
 }
@@ -3222,6 +3388,22 @@ button.danger:hover:not(:disabled) {
   border-color: var(--border);
   color: var(--text);
   font-weight: 600;
+}
+/* 选中态不再画顶部横条（视觉噪音大），改由「面板底色 + 边框 + 加粗字重 +
+   徽章不压暗」四重信号表达 */
+/* 用内容面板色盖住标签栏底边线：选中标签与下方工作区"接上"，不再被一条横线切断 */
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--bg);
+}
+.tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .tab-kind {
@@ -3237,9 +3419,21 @@ button.danger:hover:not(:disabled) {
   color: #fff;
 }
 
-.tab-kind.kind-query { background: #1666c4; }
-.tab-kind.kind-data { background: #2f7d4f; }
-.tab-kind.kind-design { background: #8a5a17; }
+/* 类型徽章改用语义色令牌：4 套主题（含 midnight / forest）都能自动适配，
+   原来写死的 hex 在非默认主题下会和整体配色打架 */
+.tab-kind.kind-query {
+  background: var(--primary);
+}
+.tab-kind.kind-data {
+  background: var(--ok);
+}
+.tab-kind.kind-design {
+  background: var(--warn);
+}
+/* 未选中的徽章压暗一档：选中标签的彩色才会跳出来当"当前位置"的锚点 */
+.tab:not(.active) .tab-kind {
+  opacity: 0.6;
+}
 
 .tab-title {
   overflow: hidden;
@@ -3256,21 +3450,25 @@ button.danger:hover:not(:disabled) {
 
 .tab-close {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  font-size: 13px;
+  width: 18px;
+  height: 18px;
+  /* 向右多探 3px：与标签内边距做视觉配平，关闭键不至于离文字太近 */
+  margin-right: -3px;
+  border-radius: 5px;
+  font-size: 14px;
   line-height: 1;
   color: var(--muted);
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
 
+/* 悬停 / 选中 / 键盘聚焦时才露出关闭键：平时不抢视觉，需要时又随手可点 */
 .tab:hover .tab-close,
-.tab.active .tab-close {
+.tab.active .tab-close,
+.tab:focus-within .tab-close {
   opacity: 1;
 }
 
@@ -3281,14 +3479,21 @@ button.danger:hover:not(:disabled) {
 
 .tab-add {
   flex-shrink: 0;
-  margin: 0 0 4px 4px;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  margin: 0 0 3px 5px;
+  padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
   color: var(--muted);
-  font-size: var(--font-sm);
+  font-size: 14px;
+  line-height: 1;
   cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .tab-add:hover {
@@ -3301,6 +3506,9 @@ button.danger:hover:not(:disabled) {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* 内容卡片与标签栏、窗口边缘之间留出一档间距：
+     左侧正好与标签页的 8px 内缩对齐，不再出现"编辑器比标签更靠左"的错位 */
+  padding: var(--gap-sm);
 }
 
 .tab-panel > * {
@@ -3313,6 +3521,8 @@ button.danger:hover:not(:disabled) {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* 编辑器与结果区之间同用一档间距，两块卡片不再上下贴死 */
+  gap: var(--gap-sm);
 }
 
 .query-tab .editor {
@@ -3376,7 +3586,8 @@ button.danger:hover:not(:disabled) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 10px 12px 0;
+  /* 内缩与工作区同一档间距，表格不贴卡片边框 */
+  padding: var(--gap-sm) var(--gap-sm) 0;
 }
 
 /* 数据标签底部分页栏 */
@@ -3440,7 +3651,9 @@ button.danger:hover:not(:disabled) {
   background: transparent;
   color: var(--text);
   font-size: var(--font-sm);
-  width: 220px;
+  /* 260px：原来的 220px 会把 placeholder 截成「过滤当前结果（任一列包…」 */
+  width: 260px;
+  min-width: 0;
 }
 .filter-clear {
   display: inline-flex;
@@ -3639,9 +3852,20 @@ button.danger:hover:not(:disabled) {
   .row-detail-head {
     padding-top: 8px;
   }
-  /* 窄屏头部空间紧张：隐藏「点击值即可复制」提示，保留行号与操作按钮 */
-  .row-detail-head .rd-hint {
+  /* 窄屏元信息条：允许换行 + 隐藏操作提示。
+     原来提示文案和四个按钮挤在一行，窄窗口下会被压成竖排（一个字一行） */
+  .meta {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .meta .tip {
     display: none;
+  }
+  /* 提示文案已移到次级操作行，820px 以下空间够用；只有极窄屏才隐藏 */
+  @media (max-width: 480px) {
+    .rd-hint {
+      display: none;
+    }
   }
 }
 
@@ -3687,9 +3911,6 @@ button.danger:hover:not(:disabled) {
 }
 
 /* ---------- 结果图表 ---------- */
-.rchart-modal {
-  width: min(760px, calc(100vw - 48px));
-}
 .rchart {
   display: flex;
   flex-direction: column;
@@ -3771,10 +3992,7 @@ button.danger:hover:not(:disabled) {
   }
 }
 
-/* ---------- 操作模板 ---------- */
-.tpl-modal {
-  width: min(820px, calc(100vw - 48px));
-}
+/* ---------- 操作模板（宽度走 size="lg"） ---------- */
 .tpl {
   display: flex;
   flex-direction: column;
@@ -3808,8 +4026,11 @@ button.danger:hover:not(:disabled) {
 }
 .tpl-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* 每张卡保底 280px：再窄 SQL 预览就会频繁折行，反而更难扫读 */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--gap-sm);
+  /* 同一行卡片等高，避免"有的卡到底、有的卡悬空"的参差感 */
+  align-items: stretch;
 }
 .tpl-card {
   display: flex;
@@ -3848,19 +4069,22 @@ button.danger:hover:not(:disabled) {
   font-size: var(--font-sm);
 }
 .tpl-card-sql {
-  display: block;
+  display: -webkit-box;
   width: 100%;
   margin-top: 4px;
-  max-height: 76px;
+  /* 按整行截断（4 行）：原来的 max-height + 渐隐会把最后一行切在中间，
+     看起来像渲染坏了；行数固定后各卡片预览区高度也自然对齐 */
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  /* 底部渐隐代替生硬截断：被裁掉的 SQL 不再出现"切一半"的断头行 */
-  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
   color: var(--muted);
   font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 11px;
   line-height: 1.45;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* 短 SQL（2~3 行）也占满 4 行高度，整行卡片底边齐平 */
+  min-height: calc(4 * 1.45 * 11px);
 }
 .tpl-foot {
   display: flex;
@@ -3873,9 +4097,7 @@ button.danger:hover:not(:disabled) {
 }
 
 /* ---------- 新手引导 ---------- */
-.guide-modal {
-  width: min(720px, calc(100vw - 48px));
-}
+/* ---------- 新手引导（宽度走 size="lg"） ---------- */
 .guide {
   display: flex;
   flex-direction: column;

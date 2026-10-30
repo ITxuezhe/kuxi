@@ -282,6 +282,24 @@ function onSortClick(col: string): void {
   emit('sort', col, next);
 }
 
+/** 是否拿到了列类型（有 schema 信息才有类型可显示） */
+const hasColumnTypes = computed<boolean>(() => Object.keys(props.columnTypes).length > 0);
+
+/**
+ * 是否显示列类型小字。
+ * 默认关闭：单行表头更干净（类型信息挪到悬停提示里），需要时一键打开。
+ */
+const showColTypes = ref(false);
+
+/** 表头悬停提示：类型（默认唯一的常驻出口）+ 排序说明 */
+function thTitle(col: string): string | undefined {
+  const parts: string[] = [];
+  const type = colType(col);
+  if (type) parts.push(type);
+  if (props.sortable) parts.push('点击排序：升序 → 降序 → 取消');
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
 /** 行右键菜单项：可编辑网格额外提供「设为 NULL」与「删除此行」（Navicat 标配） */
 function onCellContextMenu(
   event: MouseEvent,
@@ -872,7 +890,7 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
 </script>
 
 <template>
-  <div class="result" aria-live="polite">
+  <div class="result" :class="{ 'show-col-types': showColTypes }" aria-live="polite">
     <!-- 1) 执行中：骨架屏 -->
     <template v-if="props.loading">
       <div class="meta">
@@ -967,8 +985,19 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
           <span>冻结首行</span>
         </button>
         <button
+          v-if="hasColumnTypes"
+          class="ghost meta-toggle"
+          type="button"
+          :class="{ 'is-on': showColTypes }"
+          title="显示 / 隐藏列类型标注"
+          @click="showColTypes = !showColTypes"
+        >
+          <BaseIcon name="list" :size="13" />
+          <span>列类型</span>
+        </button>
+        <button
           v-if="props.result?.rows.length"
-          class="ghost freeze-toggle"
+          class="ghost meta-action"
           type="button"
           title="用图表查看当前结果"
           @click="chartOpen = true"
@@ -992,9 +1021,9 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
                 v-for="col in columns"
                 :key="col"
                 scope="col"
-                :class="['col-head', { sortable: props.sortable, 'col-frozen': freezeFirst && col === columns[0] }]"
+                :class="['col-head', { sortable: props.sortable, 'col-frozen': freezeFirst && col === columns[0], 'is-num': typeIsNumeric(col) }]"
                 :style="colWidths[col] ? { width: colWidths[col] + 'px' } : undefined"
-                :title="props.sortable ? '点击排序：升序 → 降序 → 取消' : undefined"
+                :title="thTitle(col)"
                 @click="onSortClick(col)"
               >
                 <span class="th-name">
@@ -1036,6 +1065,7 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
                   'is-pressing': pressing === `${item.index}:${col}`,
                   editable: canEdit(col),
                   'col-frozen': freezeFirst && col === columns[0],
+                  'is-num': typeIsNumeric(col),
                 }"
                 :style="colWidths[col] ? { width: colWidths[col] + 'px' } : undefined"
                 :title="
@@ -1094,7 +1124,6 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
         <div class="row-detail-head">
           <strong>行详情</strong>
           <span class="rd-pos">第 {{ (selectedIndex ?? 0) + 1 }} 行</span>
-          <span class="rd-hint">点击值即可复制</span>
           <button
             class="icon-btn"
             type="button"
@@ -1103,15 +1132,6 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
             @click="copyRow(selectedRow)"
           >
             <BaseIcon name="copy" :size="14" />
-          </button>
-          <button
-            class="rd-copy-new"
-            type="button"
-            title="复制为新行（基于该记录新增一条，可改主键后保存）"
-            aria-label="复制为新行"
-            @click="duplicateRow(selectedRow)"
-          >
-            复制为新行
           </button>
           <button
             class="icon-btn"
@@ -1123,13 +1143,26 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
             <BaseIcon name="close" :size="14" />
           </button>
         </div>
+        <!-- 次级操作单独一行：头部只留标题与图标，窄面板里文字不会被压成竖排 -->
+        <div class="row-detail-sub">
+          <button
+            class="rd-copy-new"
+            type="button"
+            title="复制为新行（基于该记录新增一条，可改主键后保存）"
+            aria-label="复制为新行"
+            @click="duplicateRow(selectedRow)"
+          >
+            复制为新行
+          </button>
+          <span class="rd-hint">点击值即可复制</span>
+        </div>
         <div class="row-detail-grid">
           <button
             v-for="col in columns"
             :key="`rd-${col}`"
             class="rd-item"
             type="button"
-            :title="`点击复制 ${col}`"
+            :title="`${col}${colType(col) ? ' · ' + colType(col) : ''}：${cellText(selectedRow, col)}`"
             @click="copyCell(selectedRow, col)"
           >
             <span class="rd-key">
@@ -1182,7 +1215,7 @@ onBeforeUnmount(() => wrapObserver?.disconnect());
     </template>
 
     <!-- 结果图表（弹窗，避免挤占表格空间） -->
-    <Modal :open="chartOpen" title="结果图表" body-class="rchart-modal" @close="chartOpen = false">
+    <Modal :open="chartOpen" title="结果图表" size="lg" @close="chartOpen = false">
       <ResultChart
         v-if="props.result"
         :result="props.result"

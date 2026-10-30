@@ -37,7 +37,7 @@ const dialectLabel = computed<string>(() => {
 </script>
 
 <template>
-  <Modal :open="open" body-class="designer-modal" @close="emit('close')">
+  <Modal :open="open" size="xl" @close="emit('close')">
     <template #title>
       新建表
       <span class="dialect-tag">{{ dialectLabel }}</span>

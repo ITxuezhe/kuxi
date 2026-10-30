@@ -16,7 +16,7 @@ const emit = defineEmits<{ (e: 'close'): void }>();
 </script>
 
 <template>
-  <Modal :open="open" :title="title" body-class="info-modal" @close="emit('close')">
+  <Modal :open="open" :title="title" size="md" @close="emit('close')">
     <div class="info-body">
       <pre>{{ content }}</pre>
     </div>

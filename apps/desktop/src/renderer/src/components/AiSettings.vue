@@ -166,7 +166,7 @@ async function onSave(): Promise<void> {
   <Modal
     :open="open"
     title="AI 模型配置"
-    body-class="settings-modal"
+    size="md"
     :busy="testing || saving"
     @close="emit('close')"
   >

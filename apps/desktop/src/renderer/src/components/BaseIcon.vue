@@ -42,6 +42,7 @@ export type IconName =
   | 'link'
   | 'info'
   | 'menu'
+  | 'list'
   | 'filter'
   | 'chart'
   | 'file'
@@ -72,6 +73,7 @@ const PATHS: Record<IconName, string> = {
   stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   menu: '<path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>',
+  list: '<path d="M9 6h12"/><path d="M9 12h12"/><path d="M9 18h12"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/>',
   refresh:
     '<path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.36 2.64L21 8"/><path d="M21 3v5h-5"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',

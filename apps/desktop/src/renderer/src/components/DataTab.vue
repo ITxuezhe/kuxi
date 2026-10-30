@@ -106,7 +106,7 @@ function queryWithSql(): void {
           v-model="filterText"
           class="filter-input"
           type="text"
-          placeholder="过滤当前结果（任一列包含即匹配）"
+          placeholder="过滤当前结果…"
           :aria-label="`过滤 ${tab.table} 的数据`"
         />
         <button

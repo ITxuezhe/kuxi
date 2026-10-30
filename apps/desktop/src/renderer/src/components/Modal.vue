@@ -11,13 +11,23 @@
  * - 进出场过渡动画（淡入 + 轻微上移缩放，交互更"优雅"）
  *
  * 用法：
- *   <Modal :open="open" title="编辑连接" @close="open = false">
+ *   <Modal :open="open" title="编辑连接" size="md" @close="open = false">
  *     <p>内容</p>
  *     <template #footer><button>确定</button></template>
  *   </Modal>
+ *
+ * 尺寸约定（全站只有这 4 档，宽度在 styles.css 的 --modal-w-* 里定义）：
+ *   sm 460 · 短确认 / 单段说明
+ *   md 620 · 表单类（连接、设置、信息）—— 默认档
+ *   lg 820 · 列表 / 卡片 / 图表 / 引导
+ *   xl 940 · 数据密集（表设计器、导入向导）
+ * 不允许再给弹窗单独写 width，否则各弹窗宽度会再次发散。
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import BaseIcon from './BaseIcon.vue';
+
+/** 弹窗宽度档位（宽度值见 styles.css 的 --modal-w-*） */
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const props = withDefaults(
   defineProps<{
@@ -31,12 +41,22 @@ const props = withDefaults(
     danger?: boolean;
     /** 进行中：禁用遮罩 / Esc / X 关闭，避免中途误关 */
     busy?: boolean;
-    /** 挂到 .modal 上的额外 class（如 conn-modal / settings-modal / designer-modal） */
+    /** 宽度档位：全站统一 4 档，默认 md */
+    size?: ModalSize;
+    /** 挂到 .modal 上的额外 class（用于布局微调，如 conn-modal / designer-modal；不要再用它写宽度） */
     bodyClass?: string;
     /** 自定义无障碍标题 id（一般无需传） */
     labelledBy?: string;
   }>(),
-  { title: '', closable: true, danger: false, busy: false, bodyClass: '', labelledBy: '' },
+  {
+    title: '',
+    closable: true,
+    danger: false,
+    busy: false,
+    size: 'md',
+    bodyClass: '',
+    labelledBy: '',
+  },
 );
 
 const emit = defineEmits<{ (e: 'close'): void }>();
@@ -130,7 +150,7 @@ watch(
       >
         <div
           class="modal"
-          :class="[danger ? 'danger-modal' : '', bodyClass]"
+          :class="[`modal-${size}`, danger ? 'danger-modal' : '', bodyClass]"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="title || $slots.title ? titleId : undefined"

@@ -222,7 +222,8 @@ onMounted(() => {
     smoothScrolling: true,
     tabSize: 2,
     wordWrap: 'on',
-    padding: { top: 10, bottom: 10 },
+    // 首行文字不贴容器上边框：上下各留 12px，视觉重量与左右留白接近
+    padding: { top: 12, bottom: 12 },
     fontFamily: "'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', 'Courier New', monospace",
     scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
     overviewRulerLanes: 0,
@@ -245,6 +246,15 @@ onMounted(() => {
     ev.preventDefault();
     showMenu(ev);
   });
+
+  // 兜底布局：automaticLayout 依赖 ResizeObserver，首帧/标签切换时偶尔测不到容器尺寸，
+  // 表现为编辑器塌成一行高、下面一大片空白。这里补一次主动 layout，避免该状态残留。
+  requestAnimationFrame(() => editor?.layout());
+});
+
+// 拖拽改高度、切换字号档位后立即重排（不依赖 ResizeObserver 的触发时机）
+watch([editorHeight, fontSize], () => {
+  requestAnimationFrame(() => editor?.layout());
 });
 
 // 外部内容变化（格式化/AI 优化/应用 SQL）→ 写回编辑器
@@ -285,6 +295,17 @@ onBeforeUnmount(() => {
 <template>
   <div class="editor">
     <div ref="containerRef" class="monaco-host" :style="{ height: `${editorHeight}px` }"></div>
+    <!-- 空态占位兜底：Monaco 的 placeholder 选项在部分版本/主题下不渲染，
+         导致空编辑器是一整块空白（看起来像坏掉的输入框）。这里用 CSS 浮层补齐，
+         pointer-events:none 保证点击仍落到编辑器上 -->
+    <p
+      v-if="!modelValue && !props.running"
+      class="editor-placeholder"
+      :style="{ height: `${editorHeight}px`, fontSize: `${FONT_PX[fontSize]}px` }"
+      aria-hidden="true"
+    >
+      在这里输入 SQL，例如 SELECT * FROM 表名 LIMIT 100;
+    </p>
     <div
       class="editor-drag"
       :class="{ dragging }"
@@ -296,27 +317,29 @@ onBeforeUnmount(() => {
       @dblclick="resetHeight"
     ></div>
     <div class="editor-foot">
-      <span>
+      <span class="foot-hint">
         <span class="kbd">{{ modifierKey }}</span>
         <span aria-hidden="true"> + </span>
         <span class="kbd">Enter</span>
         <span> 执行</span>
       </span>
-      <span v-if="props.running" style="color: var(--muted)">执行中，编辑已临时锁定…</span>
+      <span v-if="props.running" class="foot-running">执行中，编辑已临时锁定…</span>
       <span class="spacer"></span>
-      <button type="button" class="link" title="EXPLAIN 查看执行计划" @click="onExplainPlan">
-        执行计划
-      </button>
-      <button type="button" class="link" :disabled="!aiReady" @click="onExplain">AI 解释</button>
-      <button type="button" class="link" :disabled="!aiReady" @click="onOptimize">AI 优化</button>
-      <button
-        type="button"
-        class="link"
-        :disabled="!aiReady || !errorText"
-        :title="errorText ? '根据最近一次报错修正 SQL' : '需先执行并出现报错'"
-        @click="onFix"
-      >AI 修复</button>
-      <span>{{ modelValue.length }} 字符</span>
+      <div class="foot-actions">
+        <button type="button" class="link" title="EXPLAIN 查看执行计划" @click="onExplainPlan">
+          执行计划
+        </button>
+        <button type="button" class="link" :disabled="!aiReady" @click="onExplain">AI 解释</button>
+        <button type="button" class="link" :disabled="!aiReady" @click="onOptimize">AI 优化</button>
+        <button
+          type="button"
+          class="link"
+          :disabled="!aiReady || !errorText"
+          :title="errorText ? '根据最近一次报错修正 SQL' : '需先执行并出现报错'"
+          @click="onFix"
+        >AI 修复</button>
+      </div>
+      <span class="char-count">{{ modelValue.length }} 字符</span>
     </div>
   </div>
 </template>

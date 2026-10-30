@@ -589,7 +589,7 @@ watch(
   <Modal
     :open="open"
     title="导入数据"
-    body-class="import-modal"
+    size="xl"
     :busy="importing"
     @close="requestClose"
   >

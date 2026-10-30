@@ -988,7 +988,7 @@ onMounted(async () => {
     />
 
     <!-- 可视化查询构建器 -->
-    <Modal :open="builderOpen" title="查询构建器" body-class="qb-modal" @close="builderOpen = false">
+    <Modal :open="builderOpen" title="查询构建器" size="lg" @close="builderOpen = false">
       <QueryBuilder
         :open="builderOpen"
         :connection-id="activeId"
@@ -1002,7 +1002,7 @@ onMounted(async () => {
     </Modal>
 
     <!-- 操作模板 -->
-    <Modal :open="templateOpen" title="操作模板" body-class="tpl-modal" @close="templateOpen = false">
+    <Modal :open="templateOpen" title="操作模板" size="lg" @close="templateOpen = false">
       <TemplatePicker
         :open="templateOpen"
         :db-type="dbType"
@@ -1012,7 +1012,7 @@ onMounted(async () => {
     </Modal>
 
     <!-- 新手引导 -->
-    <Modal :open="guideOpen" title="3 分钟上手库犀" body-class="guide-modal" @close="closeGuide">
+    <Modal :open="guideOpen" title="3 分钟上手库犀" size="lg" @close="closeGuide">
       <GuideModal :open="guideOpen" :version="appVersion" @check="checkUpdates" @close="closeGuide" />
     </Modal>
 
@@ -1023,6 +1023,7 @@ onMounted(async () => {
     <Modal
       :open="connModal.open"
       :title="connModal.mode === 'edit' ? '编辑连接' : '新建连接'"
+      size="md"
       body-class="conn-modal"
       @close="connModal.open = false"
     >
@@ -1039,6 +1040,7 @@ onMounted(async () => {
     <Modal
       :open="urlImport.open"
       title="从链接导入连接"
+      size="md"
       body-class="conn-modal"
       @close="urlImport.open = false"
     >
