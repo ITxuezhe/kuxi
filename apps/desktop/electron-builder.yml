@@ -1,5 +1,10 @@
 # electron-builder 打包配置
 # 产物输出到 apps/desktop/dist/（不入库）
+#
+# 国内网络下载 electron 分发二进制容易超时（会卡在 packaging 阶段），可用镜像：
+#   ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
+#   ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ \
+#   pnpm dist
 appId: com.kuxi.app
 productName: 库犀
 copyright: Copyright © 2024 库犀
