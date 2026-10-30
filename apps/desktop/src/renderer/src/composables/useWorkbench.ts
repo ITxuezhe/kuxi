@@ -284,10 +284,20 @@ export function useWorkbench() {
     }
   }
 
+  /** 查询标签自动编号：查询 → 查询 2 → 查询 3。
+   *  按"已占用的标题"取下一个空位，关掉中间某个再新开也不会重名 */
+  function nextQueryTitle(): string {
+    const used = new Set(tabs.value.filter((t) => t.kind === 'query').map((t) => t.title));
+    if (!used.has('查询')) return '查询';
+    let n = 2;
+    while (used.has(`查询 ${n}`)) n += 1;
+    return `查询 ${n}`;
+  }
+
   function openQuery(initialSql = ''): WorkbenchTab {
     const tab = makeTab({
       kind: 'query',
-      title: '查询',
+      title: nextQueryTitle(),
       sql: initialSql,
       dirty: Boolean(initialSql),
     });
