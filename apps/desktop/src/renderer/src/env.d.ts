@@ -14,6 +14,7 @@ import type {
   ExporterInfo,
   ExportOutcome,
   ExportWithRequest,
+  HistoryEntry,
   IConnectionConfig,
   QueryResult,
   UpdateStatus,
@@ -53,8 +54,16 @@ declare global {
       updateConnection(id: string, config: IConnectionConfig): Promise<{ id: string }>;
       deleteConnection(id: string): Promise<{ ok: boolean }>;
       query(id: string, sql: string): Promise<QueryResult>;
-      /** 统一执行入口，返回信封（含"需确认"与"业务错误"分支） */
-      execute(id: string, sql: string, confirmed?: boolean): Promise<ExecuteOutcome>;
+      /**
+       * 统一执行入口，返回信封（含"需确认"与"业务错误"分支）。
+       * record=false 时不写入执行历史（网格分页等后台语句用）。
+       */
+      execute(
+        id: string,
+        sql: string,
+        confirmed?: boolean,
+        record?: boolean,
+      ): Promise<ExecuteOutcome>;
       listConnections(): Promise<ConnectionItem[]>;
       test(config: IConnectionConfig): Promise<{ ok: boolean; message: string }>;
       testExisting(
@@ -84,6 +93,12 @@ declare global {
       aiSaveConfig(input: AiConfigInput): Promise<AiConfigPublic>;
       aiTest(draft?: Partial<AiConfigInput>): Promise<AiTestResult>;
       aiChat(messages: AiMessage[]): Promise<AiChatOutcome>;
+
+      // ---- 执行历史 / 收藏（均返回更新后的完整列表） ----
+      historyList(): Promise<HistoryEntry[]>;
+      historyToggleFavorite(id: string): Promise<HistoryEntry[]>;
+      historyDelete(id: string): Promise<HistoryEntry[]>;
+      historyClear(): Promise<HistoryEntry[]>;
 
       // ---- 自动更新 ----
       checkUpdates(): Promise<UpdateStatus>;

@@ -121,7 +121,13 @@ async function run(
   tab.error = '';
   tab.result = null;
   try {
-    const outcome = await window.kuxi.execute(connIdRef.value, sql, confirmed);
+    // 只有查询标签的手写 SQL 进历史；数据网格的生成语句不记录，避免把历史刷成噪音
+    const outcome = await window.kuxi.execute(
+      connIdRef.value,
+      sql,
+      confirmed,
+      tab.kind === 'query',
+    );
     if (outcome.status === 'ok') {
       const r = outcome.result;
       tab.result = r;
@@ -157,7 +163,7 @@ async function execAndRefresh(tab: WorkbenchTab, sql: string): Promise<void> {
   }
   tab.insertBusy = true;
   try {
-    const outcome = await window.kuxi.execute(connIdRef.value, sql, false);
+    const outcome = await window.kuxi.execute(connIdRef.value, sql, false, false);
     if (outcome.status === 'ok') {
       toast.success('已更新 1 行');
       await run(tab, tab.gridSql);
@@ -391,7 +397,7 @@ export function useWorkbench() {
         ch.setNull,
       );
       try {
-        const outcome = await window.kuxi.execute(connIdRef.value, sql, false);
+        const outcome = await window.kuxi.execute(connIdRef.value, sql, false, false);
         if (outcome.status !== 'ok') {
           toast.error(`第 ${done + 1} 处修改失败：${outcome.message}（其余修改仍在暂存区）`);
           return;
@@ -468,7 +474,7 @@ export function useWorkbench() {
     tab.designBusy = true;
     tab.designError = '';
     try {
-      const outcome = await window.kuxi.execute(connIdRef.value, ddl, false);
+      const outcome = await window.kuxi.execute(connIdRef.value, ddl, false, false);
       if (outcome.status === 'ok') {
         toast.success('已创建表');
         schemaRefreshToken.value += 1;

@@ -7,7 +7,6 @@
  * 组件保持受控（v-model:modelValue），不持有业务状态。
  */
 import type { DbType } from '@kuxi/shared';
-import BaseIcon from './BaseIcon.vue';
 
 interface DbTypeOption {
   name: DbType;
@@ -21,11 +20,11 @@ interface DbTypeOption {
 const props = defineProps<{ modelValue: DbType }>();
 const emit = defineEmits<{ 'update:modelValue': [value: DbType] }>();
 
-/** 三个候选类型 */
+/** 三个候选类型（desc 控制在 8 字内，保证三列并排时不截断） */
 const OPTIONS: readonly DbTypeOption[] = [
-  { name: 'sqlite', label: 'SQLite', desc: '本地文件库，零配置即可用', accent: '#4b9be0' },
-  { name: 'mysql', label: 'MySQL', desc: '常用关系型数据库服务', accent: '#e08d3c' },
-  { name: 'postgres', label: 'PostgreSQL', desc: '功能丰富的对象关系库', accent: '#5f9bd6' },
+  { name: 'sqlite', label: 'SQLite', desc: '本地文件库，零配置', accent: '#4b9be0' },
+  { name: 'mysql', label: 'MySQL', desc: '常用关系型数据库', accent: '#e08d3c' },
+  { name: 'postgres', label: 'PostgreSQL', desc: '对象关系型，功能全', accent: '#5f9bd6' },
 ];
 
 /**
@@ -77,6 +76,7 @@ function onArrowKeydown(event: KeyboardEvent): void {
       role="radio"
       :aria-checked="item.name === modelValue"
       :aria-label="item.label + '：' + item.desc"
+      :title="item.desc"
       :tabindex="item.name === modelValue ? 0 : -1"
       :data-db-type="item.name"
       @click="select(item.name)"
@@ -128,9 +128,6 @@ function onArrowKeydown(event: KeyboardEvent): void {
       <span class="db-type-text">
         <span class="db-type-name">{{ item.label }}</span>
         <span class="db-type-desc">{{ item.desc }}</span>
-      </span>
-      <span v-if="item.name === modelValue" class="db-type-check" aria-hidden="true">
-        <BaseIcon name="check" :size="16" />
       </span>
     </button>
   </div>

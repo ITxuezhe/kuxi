@@ -44,6 +44,8 @@ export type IconName =
   | 'filter'
   | 'chart'
   | 'file'
+  | 'clock'
+  | 'star'
   | 'brand';
 
 const props = withDefaults(
@@ -100,6 +102,8 @@ const PATHS: Record<IconName, string> = {
     '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
   file:
     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  star: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/>',
   /**
    * 应用徽标（自绘彩色版，与应用图标 icon.svg 同一造型）：
    * 深蓝圆角底板 + 蓝色渐变数据库圆柱 + 负形问号。

@@ -13,6 +13,7 @@ import type {
   ExporterInfo,
   ExportOutcome,
   ExportWithRequest,
+  HistoryEntry,
   IConnectionConfig,
   UpdateStatus,
 } from '@kuxi/shared';
@@ -32,9 +33,12 @@ const api = {
   deleteConnection: (id: string) => ipcRenderer.invoke(IPC.DeleteConnection, id),
   /** 只读查询（保留旧签名，永远只读） */
   query: (id: string, sql: string) => ipcRenderer.invoke(IPC.QueryReadonly, id, sql),
-  /** 执行 SQL（含写操作）；confirmed=true 表示用户已对高危语句二次确认 */
-  execute: (id: string, sql: string, confirmed = false): Promise<ExecuteOutcome> =>
-    ipcRenderer.invoke(IPC.Execute, id, sql, confirmed),
+  /**
+   * 执行 SQL（含写操作）；confirmed=true 表示用户已对高危语句二次确认。
+   * record=false 时不写入执行历史（数据网格分页/单元格更新等后台语句用）。
+   */
+  execute: (id: string, sql: string, confirmed = false, record = true): Promise<ExecuteOutcome> =>
+    ipcRenderer.invoke(IPC.Execute, id, sql, confirmed, record),
   listConnections: () => ipcRenderer.invoke(IPC.ListConnections),
   test: (config: IConnectionConfig) => ipcRenderer.invoke(IPC.TestConnection, config),
   testExisting: (id: string, config: IConnectionConfig) =>
@@ -70,6 +74,14 @@ const api = {
     ipcRenderer.invoke(IPC.AiTest, draft),
   aiChat: (messages: AiMessage[]): Promise<AiChatOutcome> =>
     ipcRenderer.invoke(IPC.AiChat, messages),
+
+  // ---- 执行历史 / 收藏（均返回更新后的完整列表） ----
+  historyList: (): Promise<HistoryEntry[]> => ipcRenderer.invoke(IPC.HistoryList),
+  historyToggleFavorite: (id: string): Promise<HistoryEntry[]> =>
+    ipcRenderer.invoke(IPC.HistoryToggleFavorite, id),
+  historyDelete: (id: string): Promise<HistoryEntry[]> =>
+    ipcRenderer.invoke(IPC.HistoryDelete, id),
+  historyClear: (): Promise<HistoryEntry[]> => ipcRenderer.invoke(IPC.HistoryClear),
 
   // ---- 自动更新 ----
   checkUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.UpdateCheck),

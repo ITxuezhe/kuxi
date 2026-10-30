@@ -23,6 +23,7 @@ import {
   type ConnectionExportOutcome,
   type ConnectionImportOutcome,
   type ConnectionSort,
+  type DbType,
   type ExecuteOutcome,
   type ExportOutcome,
   type ExportWithRequest,
@@ -38,6 +39,7 @@ import {
 } from './store';
 import { aiChat, aiTest, chatEndpoint, getAiConfigPublic, saveAiConfig } from './ai';
 import { initUpdater, registerUpdateIpc } from './updater';
+import { clearHistory, deleteHistory, listHistory, recordHistory, toggleFavorite } from './history';
 
 const manager = new ConnectionManager();
 
@@ -148,6 +150,20 @@ function toConfig(s: StoredConnection): IConnectionConfig {
 /** 判断某连接当前是否处于已连接（active）状态 */
 function isActive(id: string): boolean {
   return manager.list().some((c) => c.id === id);
+}
+
+/** 历史记录里的连接信息：连接可能已被删除，名字给兜底而不是留空 */
+function historyMeta(id: string): {
+  connectionId: string;
+  connectionName: string;
+  type: DbType;
+} {
+  const stored = readStore().find((s) => s.id === id);
+  return {
+    connectionId: id,
+    connectionName: stored?.name ?? '未知连接',
+    type: stored?.type ?? 'sqlite',
+  };
 }
 
 function createWindow(): void {
@@ -296,10 +312,18 @@ function registerIpc(): void {
   /**
    * 执行 SQL（统一入口）。
    * 裁决顺序：只读模式 → 权限 → 危险级别（core 内），业务失败用信封返回，便于 UI 弹确认框。
+   * record=false 用于数据网格/表单生成的后台语句（分页、单元格更新等），
+   * 避免自动化的 SQL 把用户手写的历史刷掉。
    */
   ipcMain.handle(
     IPC.Execute,
-    async (_e, id: string, sql: string, confirmed = false): Promise<ExecuteOutcome> => {
+    async (
+      _e,
+      id: string,
+      sql: string,
+      confirmed = false,
+      record = true,
+    ): Promise<ExecuteOutcome> => {
       const settings = getSettings();
       if (settings.readOnly) {
         const analysis = analyzeSql(sql);
@@ -318,16 +342,40 @@ function registerIpc(): void {
           confirmed,
           maxRows: 500,
         });
+        if (record && sql.trim()) {
+          recordHistory({
+            sql,
+            ...historyMeta(id),
+            tookMs: result.tookMs,
+            success: true,
+            rowCount: result.affectedRows ?? result.rowCount,
+          });
+        }
         return { status: 'ok', result };
       } catch (e) {
         const err = normalizeError(e, sql);
         if (err.code === 'CONFIRM_REQUIRED' && err.analysis) {
           return { status: 'confirm', sql, analysis: err.analysis };
         }
+        if (record && sql.trim()) {
+          recordHistory({
+            sql,
+            ...historyMeta(id),
+            tookMs: 0,
+            success: false,
+            error: err.message,
+          });
+        }
         return { status: 'error', code: err.code, message: err.message };
       }
     },
   );
+
+  // ---- 执行历史 / 收藏 ----
+  ipcMain.handle(IPC.HistoryList, async () => listHistory());
+  ipcMain.handle(IPC.HistoryToggleFavorite, async (_e, id: string) => toggleFavorite(id));
+  ipcMain.handle(IPC.HistoryDelete, async (_e, id: string) => deleteHistory(id));
+  ipcMain.handle(IPC.HistoryClear, async () => clearHistory());
 
   ipcMain.handle(IPC.ListConnections, async () => {
     const saved = readStore().map(toPublic);

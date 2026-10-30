@@ -354,19 +354,15 @@ async function onAiFill(): Promise<void> {
 
 <template>
   <form class="conn-form" novalidate @submit.prevent="onSave">
-    <!-- 自然语言连接向导 -->
+    <!-- 自然语言连接向导：单行输入，标题收进输入框内，省出一行高度 -->
     <div class="ai-fill">
-      <div class="ai-fill-head">
-        <BaseIcon name="sparkles" :size="14" />
-        <span class="ai-fill-title">AI 帮我填</span>
-        <span class="ai-fill-hint">用大白话描述连接，自动识别类型与字段</span>
-      </div>
       <div class="ai-fill-row">
+        <span class="ai-fill-icon" aria-hidden="true"><BaseIcon name="sparkles" :size="14" /></span>
         <input
           v-model="nlInput"
           type="text"
           :disabled="aiBusy || !aiReady"
-          placeholder="例如：连本地的 MySQL，库名 app_db，用户 root，密码 123456"
+          placeholder="AI 帮我填：连本地的 MySQL，库名 app_db，用户 root，密码 123456"
           aria-label="用自然语言描述连接"
           @keydown.enter.prevent="onAiFill"
         />
@@ -389,7 +385,9 @@ async function onAiFill(): Promise<void> {
 
     <DbTypePicker v-model="form.type" />
 
-    <div class="field-row">
+    <!-- 三列网格：标签上置，短字段并排，整体从 6 行压到 3 行 -->
+    <div class="form-grid">
+    <div class="field-row span-3">
       <label for="conn-name">名称<span class="req" aria-hidden="true">*</span></label>
       <div>
         <input
@@ -406,7 +404,7 @@ async function onAiFill(): Promise<void> {
     </div>
 
     <template v-if="isSqlite">
-      <div class="field-row">
+      <div class="field-row span-3">
         <label for="conn-file">文件<span class="req" aria-hidden="true">*</span></label>
         <div>
           <div class="inline">
@@ -440,7 +438,7 @@ async function onAiFill(): Promise<void> {
     </template>
 
     <template v-else>
-      <div class="field-row">
+      <div class="field-row span-2">
         <label for="conn-host">主机<span class="req" aria-hidden="true">*</span></label>
         <div>
           <input
@@ -471,8 +469,8 @@ async function onAiFill(): Promise<void> {
             @input="portTouched = true"
             @blur="touch('port')"
           />
-          <p id="conn-port-hint" class="field-hint">
-            默认 {{ DEFAULT_PORTS[form.type] }}，切换类型时未手动修改会自动跟随
+          <p id="conn-port-hint" class="field-hint" title="切换数据库类型时，未手动修改的端口会自动跟随该类型的默认值">
+            切换类型自动跟随
           </p>
           <p v-if="showError('port')" id="conn-port-error" class="field-error">{{ errors.port }}</p>
         </div>
@@ -524,14 +522,23 @@ async function onAiFill(): Promise<void> {
       </div>
 
       <!-- SSH 隧道：数据库只允许内网/跳板机访问时使用 -->
-      <div class="ssh-block">
+      <div class="ssh-block span-3">
         <label class="ssh-toggle">
-          <input v-model="form.sshEnabled" type="checkbox" />
-          <span>通过 SSH 隧道连接（跳板机 / 内网数据库）</span>
+          <span class="ssh-toggle-text">
+            <span class="ssh-toggle-title">通过 SSH 隧道连接</span>
+            <span class="ssh-toggle-desc">数据库只在内网可达时，经跳板机转发</span>
+          </span>
+          <input
+            v-model="form.sshEnabled"
+            class="ssh-switch"
+            type="checkbox"
+            role="switch"
+            aria-label="启用 SSH 隧道"
+          />
         </label>
 
         <div v-if="form.sshEnabled" class="ssh-body">
-          <div class="field-row">
+          <div class="field-row span-2">
             <label for="ssh-host">跳板机<span class="req" aria-hidden="true">*</span></label>
             <div>
               <input
@@ -592,22 +599,6 @@ async function onAiFill(): Promise<void> {
           </div>
 
           <div class="field-row">
-            <label for="ssh-key">私钥文件</label>
-            <div>
-              <input
-                id="ssh-key"
-                v-model="form.sshPrivateKeyPath"
-                type="text"
-                placeholder="~/.ssh/id_ed25519"
-                @blur="touch('sshAuth')"
-              />
-              <p class="field-hint">
-                填写密码或私钥路径任意一种即可；私钥支持 ~/ 开头，口令加密的私钥请填下方口令
-              </p>
-            </div>
-          </div>
-
-          <div class="field-row">
             <label for="ssh-passphrase">私钥口令</label>
             <input
               id="ssh-passphrase"
@@ -618,10 +609,25 @@ async function onAiFill(): Promise<void> {
             />
           </div>
 
-          <p v-if="showError('sshAuth')" class="field-error">{{ errors.sshAuth }}</p>
+          <div class="field-row span-3">
+            <label for="ssh-key">私钥文件</label>
+            <div>
+              <input
+                id="ssh-key"
+                v-model="form.sshPrivateKeyPath"
+                type="text"
+                placeholder="~/.ssh/id_ed25519"
+                @blur="touch('sshAuth')"
+              />
+              <p class="field-hint">密码或私钥任选其一；私钥支持 ~/ 开头</p>
+            </div>
+          </div>
+
+          <p v-if="showError('sshAuth')" class="field-error span-3">{{ errors.sshAuth }}</p>
         </div>
       </div>
     </template>
+    </div><!-- /form-grid -->
 
     <div class="actions">
       <button type="button" :disabled="disabled" :title="isValid ? '测试当前配置能否连通' : firstError" @click="onTest">

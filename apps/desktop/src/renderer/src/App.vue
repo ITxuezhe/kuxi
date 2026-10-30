@@ -13,6 +13,7 @@ import ToastHost from './components/ToastHost.vue';
 import ConfirmDialog from './components/ConfirmDialog.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import AiPanel from './components/AiPanel.vue';
+import HistoryPanel from './components/HistoryPanel.vue';
 import AiSettings from './components/AiSettings.vue';
 import QueryBuilder from './components/QueryBuilder.vue';
 import SchemaTree from './components/SchemaTree.vue';
@@ -60,6 +61,19 @@ const pendingTab = ref<WorkbenchTab | null>(null);
 /** AI 抽屉与配置 */
 const aiOpen = ref(false);
 const aiSettingsOpen = ref(false);
+/** 历史/收藏抽屉 */
+const historyOpen = ref(false);
+
+/** 右侧抽屉互斥：两个都展开会把主工作区挤没 */
+function toggleAi(): void {
+  aiOpen.value = !aiOpen.value;
+  if (aiOpen.value) historyOpen.value = false;
+}
+
+function toggleHistory(): void {
+  historyOpen.value = !historyOpen.value;
+  if (historyOpen.value) aiOpen.value = false;
+}
 
 /** 可视化查询构建器 */
 const builderOpen = ref(false);
@@ -711,10 +725,21 @@ onMounted(async () => {
           type="button"
           :aria-pressed="aiOpen"
           title="AI 助手：用中文生成 SQL"
-          @click="aiOpen = !aiOpen"
+          @click="toggleAi"
         >
           <BaseIcon name="sparkles" :size="15" />
           <span>AI</span>
+        </button>
+        <button
+          class="ghost icon-lead"
+          :class="{ 'is-on': historyOpen }"
+          type="button"
+          :aria-pressed="historyOpen"
+          title="执行历史与收藏：点一条即可回填编辑器"
+          @click="toggleHistory"
+        >
+          <BaseIcon name="clock" :size="15" />
+          <span>历史</span>
         </button>
         <button
           class="ghost icon-lead"
@@ -899,6 +924,14 @@ onMounted(async () => {
         :connected="Boolean(currentConnection?.active)"
         @close="aiOpen = false"
         @settings="aiSettingsOpen = true"
+        @apply="applySql"
+        @run="runAi"
+      />
+
+      <!-- 执行历史 / 收藏抽屉 -->
+      <HistoryPanel
+        :open="historyOpen"
+        @close="historyOpen = false"
         @apply="applySql"
         @run="runAi"
       />

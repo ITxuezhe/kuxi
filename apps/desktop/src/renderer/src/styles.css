@@ -124,7 +124,8 @@ textarea:focus-visible,
   outline-offset: 2px;
 }
 
-input,
+/* 复选框/单选框不吃通用输入框样式（width:100% 会把勾选框拉满整行） */
+input:not([type='checkbox']):not([type='radio']),
 select,
 textarea {
   background: var(--panel);
@@ -523,35 +524,34 @@ textarea:disabled {
   gap: var(--gap-sm);
 }
 
-/* 自然语言连接向导 */
+/* 自然语言连接向导：标题收进输入框，整块只占一行 */
 .ai-fill {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: var(--pad-card);
+  gap: 4px;
+  padding: var(--gap-sm) var(--pad-card);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
   background: var(--primary-soft);
 }
-.ai-fill-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.ai-fill-title {
-  font-weight: 600;
-}
-.ai-fill-hint {
-  color: var(--muted);
-  font-size: var(--font-sm);
-}
 .ai-fill-row {
   display: flex;
+  align-items: center;
   gap: var(--gap-xs);
+  position: relative;
+}
+/* 图标嵌在输入框左侧，不再单独占一行标题 */
+.ai-fill-icon {
+  position: absolute;
+  left: 10px;
+  display: inline-flex;
+  color: var(--primary);
+  pointer-events: none;
 }
 .ai-fill-row > input {
   flex: 1;
   min-width: 0;
+  padding-left: 32px;
 }
 .ai-fill-row > button {
   flex-shrink: 0;
@@ -571,15 +571,32 @@ textarea:disabled {
 .ai-fill-msg.err {
   color: var(--danger);
 }
-.field-row {
+/* 表单网格：标签上置 + 三列并排，短字段（端口/用户/密码）不必各占一行 */
+.form-grid,
+.ssh-body {
   display: grid;
-  grid-template-columns: 92px 1fr;
-  align-items: center;
-  gap: var(--gap-sm);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap-sm) var(--gap);
+  align-items: start;
+}
+.form-grid .span-2,
+.ssh-body .span-2 {
+  grid-column: span 2;
+}
+.form-grid .span-3,
+.ssh-body .span-3 {
+  grid-column: 1 / -1;
+}
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 .field-row > label {
   color: var(--muted);
   font-size: var(--font-sm);
+  line-height: 1.3;
 }
 .field-row > label .req {
   color: var(--danger);
@@ -613,7 +630,7 @@ textarea:disabled {
   border-color: var(--primary);
   color: var(--primary);
 }
-/* SSH 隧道：折叠区 */
+/* SSH 隧道：折叠区（展开后与主表单共用三列网格） */
 .ssh-block {
   display: flex;
   flex-direction: column;
@@ -621,23 +638,70 @@ textarea:disabled {
   padding: var(--gap-sm) var(--pad-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: var(--panel-2);
 }
+/* 标题行：左文右开关，整行可点 */
 .ssh-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: var(--font-sm);
+  gap: var(--gap-sm);
   cursor: pointer;
 }
-.ssh-toggle > input {
-  margin: 0;
-}
-.ssh-body {
+.ssh-toggle-text {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
+  gap: 2px;
+  min-width: 0;
 }
+.ssh-toggle-title {
+  color: var(--text);
+  font-size: var(--font-size);
+  font-weight: 600;
+}
+.ssh-toggle-desc {
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+/* 胶囊滑块：用 appearance:none 自绘，既贴合主题也不会被拉伸 */
+.ssh-switch {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 18px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-3);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ssh-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s, background 0.15s;
+}
+.ssh-switch:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.ssh-switch:checked::after {
+  transform: translateX(16px);
+  background: var(--on-primary);
+}
+/* 展开区与标题行之间用细线分隔 */
+.ssh-body {
+  padding-top: var(--gap-sm);
+  border-top: 1px solid var(--border);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
@@ -663,17 +727,17 @@ textarea:disabled {
   color: var(--danger);
 }
 
-/* ---------- 数据库类型选择器（竖向卡片列表，窄侧栏内也不会挤压换行） ---------- */
+/* ---------- 数据库类型选择器（弹窗内横向三选一，一行搞定） ---------- */
 .db-type-picker {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--gap-xs);
 }
 .db-type-card {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  padding: var(--pad-card);
+  padding: var(--gap-sm) var(--pad-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel-2);
@@ -725,11 +789,19 @@ textarea:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.db-type-check {
-  flex-shrink: 0;
-  color: var(--primary);
-  font-size: var(--font-size);
-  font-weight: 700;
+/* 极窄窗口兜底：三列挤不下时退回两列，类型卡改回竖排 */
+@media (max-width: 560px) {
+  .form-grid,
+  .ssh-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .form-grid .span-2,
+  .ssh-body .span-2 {
+    grid-column: 1 / -1;
+  }
+  .db-type-picker {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ---------- 主区 ---------- */
@@ -2366,8 +2438,10 @@ button.danger:hover:not(:disabled) {
   flex-shrink: 0;
   margin-top: 1px;
 }
+/* 连接弹窗比通用弹窗宽一档：三列字段/三张类型卡才不至于拥挤 */
 .conn-modal {
-  width: min(560px, 92vw);
+  width: min(640px, 94vw);
+  max-width: min(640px, 94vw);
 }
 .confirm-message {
   margin: 0;
@@ -3393,4 +3467,104 @@ button.danger:hover:not(:disabled) {
     bottom: 12px;
     width: auto;
   }
+}
+
+/* ---------- 执行历史 / 收藏抽屉（复用 .ai-panel 的宽度与窄屏行为） ---------- */
+.history-tabs {
+  display: flex;
+  gap: var(--gap-xs);
+  padding: var(--gap-sm) var(--pad-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.history-tabs button {
+  flex: 1;
+  font-size: var(--font-sm);
+  background: var(--panel-2);
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+}
+.history-tabs button.on {
+  background: var(--panel-3);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.history-body {
+  gap: var(--gap-sm);
+}
+.history-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: 1.6;
+}
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-xs);
+  padding: var(--gap-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.history-item:hover {
+  border-color: var(--border-strong);
+}
+.history-sql {
+  margin: 0;
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: var(--font-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* 长 SQL 只显示前三行，避免一条记录占满整个面板 */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.history-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gap-xs);
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+.history-conn {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.history-dot.ok {
+  background: var(--ok);
+}
+.history-dot.fail {
+  background: var(--danger);
+}
+.history-fail {
+  color: var(--danger);
+}
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+}
+.history-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.history-star.on {
+  color: var(--warn);
 }

@@ -110,6 +110,29 @@ export interface SshConfig {
 }
 
 /**
+ * 一条执行历史（也承载「收藏」：favorite 为 true 时永不被自动淘汰）。
+ * 由主进程在 SQL 执行后自动记录，渲染进程只读列表 + 切换收藏。
+ */
+export interface HistoryEntry {
+  id: string;
+  sql: string;
+  connectionId: string;
+  /** 记录时的连接名（连接被删后仍能显示旧名字） */
+  connectionName: string;
+  type: DbType;
+  /** 执行耗时（毫秒） */
+  tookMs: number;
+  success: boolean;
+  /** 失败时的中文错误信息 */
+  error?: string;
+  /** 只读查询为行数，写语句为影响行数 */
+  rowCount?: number;
+  favorite: boolean;
+  /** ISO 时间戳 */
+  createdAt: string;
+}
+
+/**
  * 连接配置。
  * password 字段仅用于传输；落盘时由 Electron Main 进程加密，绝不下发到渲染进程。
  */
@@ -254,6 +277,12 @@ export const IPC = {
   AiSaveConfig: 'ai:save-config',
   AiTest: 'ai:test',
   AiChat: 'ai:chat',
+  /** 执行历史 / 收藏（以下均返回更新后的完整列表） */
+  HistoryList: 'hist:list',
+  HistoryToggleFavorite: 'hist:toggle-favorite',
+  HistoryDelete: 'hist:delete',
+  /** 清空历史（收藏保留） */
+  HistoryClear: 'hist:clear',
   /** 自动更新 */
   UpdateCheck: 'update:check',
   UpdateDownload: 'update:download',
