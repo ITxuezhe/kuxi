@@ -14,7 +14,7 @@
  * - 可编辑网格（双击表打开）底部常驻一条空白「新增行」，填写后 Enter/按钮写入
  * - 双击单元格改单格，右键复制/导出
  */
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DbType, ExporterInfo, QueryResult } from '@kuxi/shared';
 import { useClipboard } from '../composables/useClipboard';
 import { useToast } from '../composables/useToast';
@@ -88,6 +88,13 @@ const exporters = ref<ExporterInfo[]>([]);
 const editing = ref<{ rowIndex: number; col: string } | null>(null);
 const editValue = ref('');
 const editInputRef = ref<HTMLInputElement | null>(null);
+/**
+ * 函数式 ref：输入框位于 v-for 内，模板 ref 会变成数组，调用 select() 会抛错。
+ * 用函数式 ref 始终拿到单个元素，保证进入编辑时自动聚焦并全选。
+ */
+function setEditInput(el: unknown): void {
+  editInputRef.value = (el as HTMLInputElement | null) ?? null;
+}
 
 /**
  * 暂存的单元格修改（TablePlus 式：编辑不立即写库）。
@@ -550,6 +557,33 @@ function dateInputToRaw(col: string, value: string): string {
   return s;
 }
 
+/** 单击打开行详情的等待时长（ms）：先等双击判定，避免双击编辑时抢先弹出详情 */
+const ROW_CLICK_DELAY = 220;
+let rowClickTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** 取消待打开的行详情（双击/进入编辑时调用） */
+function cancelRowClick(): void {
+  if (rowClickTimer !== null) {
+    clearTimeout(rowClickTimer);
+    rowClickTimer = null;
+  }
+}
+
+/**
+ * 单击行：延时打开行详情。
+ * 详情面板宽 300px 会挤压表格，若立即打开，双击的第二次点击可能落在移动后的位置，
+ * 导致 dblclick 永不触发——这是「单击」与「双击」冲突的根因。
+ */
+function onRowClick(index: number): void {
+  cancelRowClick();
+  rowClickTimer = setTimeout(() => {
+    rowClickTimer = null;
+    selectRow(index);
+  }, ROW_CLICK_DELAY);
+}
+
+onBeforeUnmount(cancelRowClick);
+
 /**
  * 双击单元格进入编辑态（Navicat 交互）。
  * @param rowIndex 行号
@@ -557,6 +591,8 @@ function dateInputToRaw(col: string, value: string): string {
  * @param row 行数据
  */
 function startEdit(rowIndex: number, col: string, row: Record<string, unknown>): void {
+  // 双击意味着用户要编辑，不是要看详情
+  cancelRowClick();
   if (!canEdit(col)) {
     if (!props.tableName || !props.pkColumns.length) {
       toast.info('该表没有主键，无法定位行进行编辑');
@@ -858,7 +894,7 @@ onMounted(async () => {
               :key="item.index"
               class="data-row"
               :class="{ 'is-selected': selectedIndex === item.index }"
-              @click="selectRow(item.index)"
+              @click="onRowClick(item.index)"
             >
               <td class="row-num" title="查看行详情">{{ item.index + 1 }}</td>
               <td
@@ -888,7 +924,7 @@ onMounted(async () => {
               >
                 <input
                   v-if="editing && editing.rowIndex === item.index && editing.col === col"
-                  ref="editInputRef"
+                  :ref="setEditInput"
                   v-model="editValue"
                   class="cell-input"
                   :type="isDateCol(col) ? dateInputType(col) : 'text'"

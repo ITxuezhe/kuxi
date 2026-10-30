@@ -52,10 +52,6 @@ const dropConfirmOpen = ref(false);
 const dropConfirmBusy = ref(false);
 let dropResolver: ((ok: boolean) => void) | null = null;
 
-if (!props.initialName) {
-  fields.value.push(blankField());
-}
-
 /** 挂载时按 initialName 探查 schema：若表已存在则进入编辑模式并预填字段 */
 async function initFromSchema(): Promise<void> {
   if (!props.initialName) return;
@@ -127,6 +123,18 @@ function dateInputType(type: string): string {
   if (/^(DATETIME|TIMESTAMP)/.test(t)) return 'datetime-local';
   return 'text';
 }
+/** 默认值是否为 SQL 关键字（CURRENT_TIMESTAMP 等） */
+function isSqlKeyword(value: string): boolean {
+  return /^[A-Z][A-Z_]*$/.test(value.trim());
+}
+/**
+ * 默认值输入控件类型：日期型走原生控件，但关键字值（如 CURRENT_TIMESTAMP）
+ * 不是合法日期格式，原生控件会显示为空白，此时退回文本框，让关键字可见可编辑。
+ */
+function defaultInputType(f: FieldDef): string {
+  if (!isDateLike(f.type)) return 'text';
+  return isSqlKeyword(f.defaultValue) ? 'text' : dateInputType(f.type);
+}
 /** 日期型默认值快捷填入「当前时间」关键字（生成 DDL 时按关键字原样输出） */
 function setDefaultNow(index: number): void {
   fields.value[index].defaultValue = 'CURRENT_TIMESTAMP';
@@ -179,7 +187,9 @@ watch(
   { immediate: true },
 );
 
-// 首次挂载给一个空字段行
+// 首次挂载给一个空字段行（必须放在 typeOptions / blankField 定义之后，
+// 否则新建表时会在 setup 阶段触发「Cannot access 'typeOptions' before initialization」，
+// 整个表单无法渲染）
 if (!fields.value.length) fields.value.push(blankField());
 
 /** 添加字段行：滚动到新行并聚焦字段名 */
@@ -400,6 +410,7 @@ function onDropCancel(): void {
             autocomplete="off"
             @input="onTypeInput(index, ($event.target as HTMLInputElement).value)"
             @focus="openTypes(index)"
+            @blur="closeTypes"
             @keydown.escape="closeTypes"
           />
           <button
@@ -433,8 +444,9 @@ function onDropCancel(): void {
         <div class="default-cell">
           <input
             v-if="isDateLike(f.type)"
+            :key="`def-${index}-${defaultInputType(f)}`"
             v-model="f.defaultValue"
-            :type="dateInputType(f.type)"
+            :type="defaultInputType(f)"
             class="date-default"
             aria-label="默认值（日期时间选择）"
           />

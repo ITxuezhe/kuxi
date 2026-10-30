@@ -10,6 +10,7 @@
     "dev": "pnpm --filter @kuxi/desktop dev",
     "build": "pnpm --filter @kuxi/desktop build",
     "test:core": "pnpm --filter @kuxi/core test",
+    "test:desktop": "pnpm --filter @kuxi/desktop test",
     "harness": "pnpm --filter @kuxi/core harness",
     "typecheck": "pnpm --filter @kuxi/core exec tsc -p ../shared/tsconfig.json --noEmit && pnpm --filter @kuxi/core exec tsc -p tsconfig.json --noEmit"
   },

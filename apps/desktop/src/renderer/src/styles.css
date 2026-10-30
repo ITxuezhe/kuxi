@@ -909,10 +909,10 @@ th.sortable:hover {
   color: var(--primary);
 }
 
-/* 列头右侧拖拽手柄：绝对定位于 th 右缘（th 已是 sticky 定位上下文） */
-.col-head {
-  position: relative;
-}
+/* 列头右侧拖拽手柄：绝对定位于 th 右缘。
+   注意：绝对定位的包含块由 th 自身的 position: sticky 提供（见上方 th 规则）。
+   切勿在这里写 position: relative —— 类选择器优先级高于 th 元素选择器，会覆盖
+   sticky，让整行表头随内容滚走（冻结首行失效）。 */
 .col-resize {
   position: absolute;
   top: 0;
