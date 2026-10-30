@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- 库犀应用图标：数据库圆柱 + 负形问号（延续应用内 logo 语义） -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#1E2635" />
+      <stop offset="0.52" stop-color="#141A27" />
+      <stop offset="1" stop-color="#0A0D15" />
+    </linearGradient>
+
+    <radialGradient id="glow" cx="0.34" cy="0.16" r="0.78">
+      <stop offset="0" stop-color="#3B8BFF" stop-opacity="0.45" />
+      <stop offset="0.45" stop-color="#3B8BFF" stop-opacity="0.1" />
+      <stop offset="1" stop-color="#3B8BFF" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="db" x1="0" y1="352" x2="0" y2="774" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7CC2FF" />
+      <stop offset="0.4" stop-color="#2F7EEB" />
+      <stop offset="1" stop-color="#1350AC" />
+    </linearGradient>
+
+    <filter id="soft" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="22" />
+    </filter>
+
+    <!-- 问号作为遮罩挖空，保证小尺寸下轮廓依然干净 -->
+    <mask id="qm">
+      <rect width="1024" height="1024" fill="#ffffff" />
+      <path
+        d="M436 546 C436 488 468 458 512 458 C556 458 588 488 588 546 C588 580 512 588 512 608"
+        fill="none"
+        stroke="#000000"
+        stroke-width="62"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <circle cx="512" cy="688" r="34" fill="#000000" />
+    </mask>
+  </defs>
+
+  <!-- 底板 -->
+  <rect width="1024" height="1024" rx="204" fill="url(#bg)" />
+  <rect width="1024" height="1024" rx="204" fill="url(#glow)" />
+
+  <!-- 圆柱投影 -->
+  <ellipse cx="512" cy="736" rx="206" ry="58" fill="#000000" opacity="0.28" filter="url(#soft)" />
+
+  <!-- 数据库圆柱（问号处挖空透出底板） -->
+  <g mask="url(#qm)">
+    <rect x="282" y="352" width="460" height="348" fill="url(#db)" />
+    <ellipse cx="512" cy="352" rx="230" ry="74" fill="url(#db)" />
+    <ellipse cx="512" cy="700" rx="230" ry="74" fill="url(#db)" />
+
+    <!-- 数据分层 -->
+    <path d="M282 466 A230 74 0 0 0 742 466" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="7" />
+    <path d="M282 580 A230 74 0 0 0 742 580" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="7" />
+
+    <!-- 顶部高光 -->
+    <path d="M284 344 A230 74 0 0 1 740 344" fill="none" stroke="#ffffff" stroke-opacity="0.6" stroke-width="6" />
+  </g>
+</svg>
