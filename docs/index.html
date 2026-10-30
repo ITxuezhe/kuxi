@@ -450,7 +450,7 @@
         </p>
         <div class="hero-act">
           <a class="btn btn-primary" href="https://github.com/ITxuezhe/kuxi/releases/latest" target="_blank" rel="noopener">
-            下载 v0.1.0
+            下载 v<span id="hero-ver">0.1.0</span>
             <span aria-hidden="true" style="font-family:var(--mono);font-size:12px;opacity:.7">macOS</span>
           </a>
           <a class="btn" href="#entries">先看看能做什么</a>
@@ -675,8 +675,8 @@
       <div class="dl-panel reveal">
         <div class="dl-top">
           <div>
-            <h3>库犀 v0.1.0</h3>
-            <div class="ver" style="margin-top:6px">首个公开版本 · 2026-10-30</div>
+            <h3>库犀 v<span id="dl-ver">0.1.0</span></h3>
+            <div class="ver" id="dl-meta" style="margin-top:6px">最新公开版本 · 2026-10-30</div>
           </div>
           <a class="btn btn-sm" href="https://github.com/ITxuezhe/kuxi/releases" target="_blank" rel="noopener">查看全部版本 →</a>
         </div>
@@ -686,7 +686,7 @@
             <span class="glyph" aria-hidden="true">✦</span>
             <span class="t">
               <b>macOS · Apple Silicon<span class="badge" data-badge>推荐</span></b>
-              <span>M1 / M2 / M3 / M4 · dmg · 117 MB</span>
+              <span id="meta-arm64">M1 / M2 / M3 / M4 · dmg · 117 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
@@ -694,7 +694,7 @@
             <span class="glyph" aria-hidden="true">✦</span>
             <span class="t">
               <b>macOS · Intel</b>
-              <span>x64 · dmg · 122 MB</span>
+              <span id="meta-x64">x64 · dmg · 122 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
@@ -814,6 +814,61 @@
     }
     setTimeout(() => { btn.textContent = '复制'; }, 2000);
   });
+
+  // 4) 版本号与下载地址：优先读 GitHub Releases API（发布新版页面自动跟上）
+  //    页面内置的 v0.1.0 文案与直链是兜底：API 限流（未登录 60 次/小时/IP）或断网时照常可用
+  (function () {
+    const API = 'https://api.github.com/repos/ITxuezhe/kuxi/releases/latest';
+    const CACHE_KEY = 'kuxi:latest-release';
+    const TTL = 10 * 60 * 1000;
+
+    const apply = (rel) => {
+      if (!rel || !rel.tag_name) return;
+      const ver = String(rel.tag_name).replace(/^v/i, '');
+      const assets = Array.isArray(rel.assets) ? rel.assets : [];
+
+      const heroVer = document.getElementById('hero-ver');
+      if (heroVer) heroVer.textContent = ver;
+      const dlVer = document.getElementById('dl-ver');
+      if (dlVer) dlVer.textContent = ver;
+
+      const d = rel.published_at ? new Date(rel.published_at) : null;
+      const meta = document.getElementById('dl-meta');
+      if (meta) {
+        meta.textContent =
+          d && !isNaN(d.getTime())
+            ? '最新公开版本 · ' + d.getFullYear() + '-' +
+              String(d.getMonth() + 1).padStart(2, '0') + '-' +
+              String(d.getDate()).padStart(2, '0')
+            : '最新公开版本';
+      }
+
+      ['arm64', 'x64'].forEach((arch) => {
+        const asset = assets.find((a) => new RegExp('-' + arch + '\\.dmg$', 'i').test(a.name));
+        if (!asset) return;
+        const link = document.querySelector('.plat[data-arch="' + arch + '"]');
+        if (link) link.setAttribute('href', asset.browser_download_url);
+        const sizeEl = document.getElementById('meta-' + arch);
+        if (sizeEl) {
+          const label = arch === 'arm64' ? 'M1 / M2 / M3 / M4' : 'x64';
+          sizeEl.textContent = label + ' · dmg · ' + Math.round(asset.size / 1048576) + ' MB';
+        }
+      });
+    };
+
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) || 'null');
+      if (cached && Date.now() - cached.at < TTL) { apply(cached.data); return; }
+    } catch (_) { /* 忽略缓存异常 */ }
+
+    fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+      .then((rel) => {
+        apply(rel);
+        try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data: rel })); } catch (_) {}
+      })
+      .catch(() => { /* 限流/断网：保留兜底文案 */ });
+  })();
 </script>
 </body>
 </html>
