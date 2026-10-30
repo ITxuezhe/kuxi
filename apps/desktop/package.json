@@ -1,6 +1,6 @@
 {
   "name": "@kuxi/desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "库犀 — 面向开发者的桌面数据库客户端",
   "author": {
