@@ -232,9 +232,59 @@ export const IPC = {
   AiSaveConfig: 'ai:save-config',
   AiTest: 'ai:test',
   AiChat: 'ai:chat',
+  /** 自动更新 */
+  UpdateCheck: 'update:check',
+  UpdateDownload: 'update:download',
+  UpdateInstall: 'update:install',
+  UpdateGetStatus: 'update:get-status',
+  /** 主进程 → 渲染进程：广播更新状态变化 */
+  UpdateStatus: 'update:status',
+  /** 获取应用版本号（用于「关于」/检查更新入口） */
+  AppVersion: 'app:version',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
+
+// ============================================================================
+// 自动更新
+// ============================================================================
+
+/**
+ * 自动更新状态机的状态：
+ * - idle：未检查 / 未开始
+ * - checking：正在向更新服务器查询
+ * - available：有新版本可用（尚未下载）
+ * - not-available：已是最新
+ * - downloading：下载中（percent 有值）
+ * - downloaded：下载完成，可重启安装
+ * - error：检查或下载失败（message 有值）
+ * - disabled：当前环境不支持更新（开发模式 / 未配置更新源）
+ */
+export type UpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+  | 'disabled';
+
+export interface UpdateStatus {
+  state: UpdateState;
+  /** 当前运行版本（与 package.json version 一致） */
+  currentVersion: string;
+  /** 服务器上的最新版本（available / downloading / downloaded 时有值） */
+  version?: string;
+  /** 下载进度 0~100（downloading 时有值） */
+  percent?: number;
+  /** 面向用户的中文提示（error / disabled 时有值） */
+  message?: string;
+  /** 更新说明（可选，来自 latest.yml 的 releaseNotes） */
+  releaseNotes?: string;
+  /** 更新发布日期（ISO 字符串） */
+  releaseDate?: string;
+}
 
 // ============================================================================
 // 应用设置

@@ -16,6 +16,7 @@ import type {
   ExportWithRequest,
   IConnectionConfig,
   QueryResult,
+  UpdateStatus,
 } from '@kuxi/shared';
 
 interface ConnectionItem {
@@ -73,6 +74,15 @@ declare global {
       aiSaveConfig(input: AiConfigInput): Promise<AiConfigPublic>;
       aiTest(draft?: Partial<AiConfigInput>): Promise<AiTestResult>;
       aiChat(messages: AiMessage[]): Promise<AiChatOutcome>;
+
+      // ---- 自动更新 ----
+      checkUpdates(): Promise<UpdateStatus>;
+      downloadUpdate(): Promise<UpdateStatus>;
+      installUpdate(): Promise<{ ok: boolean }>;
+      updateStatus(): Promise<UpdateStatus>;
+      appVersion(): Promise<string>;
+      /** 订阅主进程推送的更新状态；返回取消订阅函数 */
+      onUpdateStatus(cb: (status: UpdateStatus) => void): () => void;
     };
   }
 }

@@ -1,0 +1,64 @@
+# electron-builder 打包配置
+# 产物输出到 apps/desktop/dist/（不入库）
+appId: com.kuxi.app
+productName: 库犀
+copyright: Copyright © 2024 库犀
+
+directories:
+  output: dist
+  buildResources: build
+
+# 只打包 electron-vite 的编译产物 + package.json。
+# main/preload 里被 external 的运行时依赖（electron-updater / mysql2 / pg）
+# 由 electron-builder 依据 dependencies 自动收进 asar，无需在此列出。
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+
+asar: true
+compression: maximum
+# SQLite 走 Node 内置 node:sqlite，没有需要重编译的原生模块
+npmRebuild: false
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    # 自动更新（Squirrel.Mac）只认 zip 增量包，必须同时产出
+    - target: zip
+      arch: [arm64, x64]
+  # 本地开发机通常没有 Apple Developer 证书，这里跳过签名以便能打出包。
+  # 正式分发时删掉 identity: null，并配置 CSC_LINK / CSC_KEY_PASSWORD + 公证（notarize）。
+  identity: null
+  # dmg 的卷标
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: 库犀
+  deleteAppDataOnUninstall: false
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# 更新源：generic 服务器（放最新版安装包 + latest.yml / latest-mac.yml 即可）。
+# ⚠️ 正式发布前把 url 换成真实地址；也可临时用命令行覆盖而无需改文件：
+#   pnpm dist -- --config.publish.url=https://your-cdn/kuxi
+publish:
+  provider: generic
+  url: https://updates.kuxi.app/desktop

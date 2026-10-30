@@ -1,17 +1,28 @@
 <script setup lang="ts">
 /**
- * AiPanel — AI 助手抽屉：自然语言 → SQL
+ * AiPanel — AI 助手抽屉：自然语言 → SQL（支持多轮追问）
  *
  * 交互设计（面向"小白也能用"）：
- * - 不需要懂 SQL，用中文描述要什么
+ * - 不需要懂 SQL，用中文描述要什么；上一轮的问题与 SQL 会作为上下文带给模型，
+ *   因此可以接着问「再加按城市分组」「把结果按金额降序」
  * - 生成结果不是"直接执行"，而是先给出 SQL 让人过目，再选择「填入编辑器」或「执行」
+ * - 每条 SQL 可单独「白话解释」，看懂再执行
  * - 执行高危语句时仍会走 ConfirmDialog（AI 生成的 SQL 同样受护栏约束）
  * - 提供示例问题，降低"不知道能问什么"的门槛
  *
- * 隐私：只发送表结构与问题文本，不发送数据行（配置面板里也明示了这一点）。
+ * 隐私：只发送表结构、问题文本与历史 SQL，不发送任何数据行。
  */
 import { computed, nextTick, ref, watch } from 'vue';
-import { askAi, buildSchemaText, buildSystemPrompt, dialectOf, extractSql, useAi } from '../composables/useAi';
+import type { AiMessage } from '@kuxi/shared';
+import {
+  askAi,
+  buildSchemaText,
+  buildSystemPrompt,
+  dialectOf,
+  explainSql,
+  extractSql,
+  useAi,
+} from '../composables/useAi';
 import { useToast } from '../composables/useToast';
 import BaseIcon from './BaseIcon.vue';
 
@@ -39,7 +50,16 @@ interface Turn {
   raw: string;
   model: string;
   tookMs: number;
+  /** 白话解释（点「白话解释」后才有） */
+  explain?: string;
+  explaining?: boolean;
 }
+
+/**
+ * 最多带入多少轮历史上下文。
+ * 只带最近几轮，避免长对话把 token 撑爆；更早的追问模型不再需要。
+ */
+const MAX_HISTORY_TURNS = 6;
 
 const question = ref('');
 const thinking = ref(false);
@@ -58,6 +78,17 @@ const canAsk = computed<boolean>(
 async function scrollToBottom(): Promise<void> {
   await nextTick();
   if (listRef.value) listRef.value.scrollTop = listRef.value.scrollHeight;
+}
+
+/**
+ * 取最近若干轮（问题 + SQL）作为上下文。
+ * 只传文本，不传数据行：既控制 token，也守隐私边界。
+ */
+function historyMessages(): AiMessage[] {
+  return turns.value.slice(-MAX_HISTORY_TURNS).flatMap((turn) => [
+    { role: 'user' as const, content: turn.question },
+    { role: 'assistant' as const, content: turn.sql },
+  ]);
 }
 
 /**
@@ -86,7 +117,7 @@ async function ask(): Promise<void> {
     const schema = await window.kuxi.getSchema(props.connectionId);
     const { text } = buildSchemaText(schema);
     const system = buildSystemPrompt(dialectOf(props.dbType), text);
-    const content = await askAi(system, q);
+    const content = await askAi(system, q, historyMessages());
     turns.value.push({
       question: q,
       sql: extractSql(content),
@@ -102,6 +133,33 @@ async function ask(): Promise<void> {
   } finally {
     thinking.value = false;
   }
+}
+
+/**
+ * 白话解释某条 SQL（可展开 / 收起）。
+ * @param turn 目标轮次
+ */
+async function explainTurn(turn: Turn): Promise<void> {
+  if (turn.explaining) return;
+  if (turn.explain) {
+    turn.explain = undefined;
+    return;
+  }
+  turn.explaining = true;
+  try {
+    turn.explain = await explainSql(turn.sql, dialectOf(props.dbType));
+    await scrollToBottom();
+  } catch (e) {
+    toast.error(`解释失败：${(e as Error).message}`);
+  } finally {
+    turn.explaining = false;
+  }
+}
+
+/** 清空对话（换库时也会调用，避免历史 SQL 张冠李戴） */
+function clearTurns(): void {
+  turns.value = [];
+  errorMsg.value = '';
 }
 
 /**
@@ -130,6 +188,12 @@ watch(
     }
   },
 );
+
+/** 切换连接即清空：历史 SQL 属于旧库，带进新库只会误导模型 */
+watch(
+  () => props.connectionId,
+  () => clearTurns(),
+);
 </script>
 
 <template>
@@ -138,6 +202,16 @@ watch(
       <BaseIcon name="sparkles" :size="18" class="ai-head-icon" />
       <strong>AI 助手</strong>
       <span class="ai-model" :title="config?.model">{{ config?.model || '未配置' }}</span>
+      <button
+        v-if="turns.length"
+        class="icon-btn"
+        type="button"
+        title="清空对话"
+        aria-label="清空对话"
+        @click="clearTurns"
+      >
+        <BaseIcon name="trash" :size="18" />
+      </button>
       <button class="icon-btn" type="button" title="AI 设置" aria-label="AI 设置" @click="emit('settings')">
         <BaseIcon name="gear" :size="18" />
       </button>
@@ -172,8 +246,17 @@ watch(
           <div class="ai-sql-actions">
             <button type="button" class="link" @click="emit('apply', turn.sql)">填入编辑器</button>
             <button type="button" class="link" @click="emit('run', turn.sql)">执行</button>
+            <button
+              type="button"
+              class="link ai-explain-btn"
+              :disabled="turn.explaining"
+              @click="explainTurn(turn)"
+            >
+              {{ turn.explaining ? '解释中…' : turn.explain ? '收起解释' : '白话解释' }}
+            </button>
           </div>
         </div>
+        <p v-if="turn.explain" class="ai-explain">{{ turn.explain }}</p>
       </div>
 
       <p v-if="thinking" class="ai-thinking">
@@ -189,7 +272,7 @@ watch(
         v-model="question"
         class="ai-input"
         rows="2"
-        placeholder="例如：查出每个用户最近一次的订单"
+        placeholder="例如：查出每个用户最近一次的订单；也可继续追问「再加按城市分组」"
         :disabled="thinking"
         @keydown="onKeydown"
       ></textarea>

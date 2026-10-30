@@ -1,31 +1,43 @@
 {
   "name": "@kuxi/desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
+  "description": "库犀 — 面向开发者的桌面数据库客户端",
+  "author": {
+    "name": "库犀",
+    "email": "dev@kuxi.app"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "dist": "electron-vite build && electron-builder",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:linux": "electron-vite build && electron-builder --linux",
+    "dist:dir": "electron-vite build && electron-builder --dir"
   },
   "dependencies": {
-    "@kuxi/core": "workspace:*",
-    "@kuxi/shared": "workspace:*",
-    "monaco-editor": "^0.57.0",
+    "electron-updater": "^6.8.11",
     "mysql2": "^3.11.3",
-    "pg": "^8.13.1",
-    "sql-formatter": "^15.4.2",
-    "vue": "^3.5.13"
+    "pg": "^8.13.1"
   },
   "devDependencies": {
+    "@kuxi/core": "workspace:*",
+    "@kuxi/shared": "workspace:*",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.5.1",
     "electron": "^35.0.0",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^2.3.0",
     "jsdom": "^25.0.1",
+    "monaco-editor": "^0.57.0",
+    "sql-formatter": "^15.4.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "vue": "^3.5.13"
   }
 }

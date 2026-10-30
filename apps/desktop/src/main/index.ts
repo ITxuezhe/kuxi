@@ -36,6 +36,7 @@ import {
   writeJson,
 } from './store';
 import { aiChat, aiTest, chatEndpoint, getAiConfigPublic, saveAiConfig } from './ai';
+import { initUpdater, registerUpdateIpc } from './updater';
 
 const manager = new ConnectionManager();
 
@@ -488,12 +489,15 @@ function registerIpc(): void {
 
 app.whenReady().then(() => {
   registerIpc();
+  registerUpdateIpc();
   // --smoke：在 Electron 运行时内跑真实 core 的端到端自检（不创建窗口）
   if (process.argv.includes('--smoke')) {
     void runSmoke();
     return;
   }
   createWindow();
+  // 窗口建好后再初始化更新器（状态广播需要接收方）
+  initUpdater();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

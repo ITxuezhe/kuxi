@@ -155,10 +155,22 @@ export function extractSql(content: string): string {
   return content.trim();
 }
 
-/** 调用 AI 生成 SQL 消息（返回原始回复，提取交给调用方） */
-export async function askAi(system: string, question: string): Promise<string> {
+/**
+ * 调用 AI 生成 SQL 消息（返回原始回复，提取交给调用方）。
+ *
+ * @param system system 提示词（含规则与 schema）
+ * @param question 用户本轮问题
+ * @param history 之前轮次的消息（user 问题 / assistant SQL），按时间正序；
+ *                多轮追问靠它把上下文带给模型，避免每次从零猜测
+ */
+export async function askAi(
+  system: string,
+  question: string,
+  history: AiMessage[] = [],
+): Promise<string> {
   const messages: AiMessage[] = [
     { role: 'system', content: system },
+    ...history,
     { role: 'user', content: question },
   ];
   const outcome = await window.kuxi.aiChat(messages);

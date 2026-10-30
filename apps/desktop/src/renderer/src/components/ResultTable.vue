@@ -21,6 +21,8 @@ import { useToast } from '../composables/useToast';
 import { openContextMenu, type MenuItem } from '../composables/useContextMenu';
 import { generateRowInsert, generateRowUpdate } from '../utils/sql';
 import BaseIcon from './BaseIcon.vue';
+import Modal from './Modal.vue';
+import ResultChart from './ResultChart.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -80,6 +82,9 @@ const emit = defineEmits<{
 
 const { copy } = useClipboard();
 const toast = useToast();
+
+/** 结果图表弹窗 */
+const chartOpen = ref(false);
 
 /** 可用的导出插件（从可插拔内核动态读取，加一个导出插件这里就多一项） */
 const exporters = ref<ExporterInfo[]>([]);
@@ -209,6 +214,18 @@ const freezeFirst = ref<boolean>(true);
 /** 冻结首行（表头吸顶）开关：默认开，纵向滚动时表头常驻 */
 const freezeHead = ref<boolean>(true);
 
+/** 横向滚动状态：用于给冻结列加投影，提示右侧还有更多列（触屏没有滚动条可看） */
+const tableWrap = ref<HTMLElement | null>(null);
+const scrolledX = ref<boolean>(false);
+let wrapObserver: ResizeObserver | null = null;
+
+/** 同步横向滚动状态（滚动、容器尺寸变化、结果刷新后调用） */
+function syncScrollState(): void {
+  const el = tableWrap.value;
+  if (!el) return;
+  scrolledX.value = el.scrollLeft > 2;
+}
+
 /** 列宽（px），键为列名；未设置的列按 CSS 自适应 */
 const colWidths = ref<Record<string, number>>({});
 
@@ -272,6 +289,12 @@ function onCellContextMenu(
   rowIndex: number,
   col: string,
 ): void {
+  // 触屏长按已进入编辑：浏览器随后补发的 contextmenu 不应再弹菜单盖住编辑框
+  if (pressHandled) {
+    event.preventDefault();
+    return;
+  }
+
   const pkValue = props.pkColumns.length ? row[props.pkColumns[0]] : undefined;
   const canLocate = props.editable && props.pkColumns.length > 0;
 
@@ -575,6 +598,12 @@ function cancelRowClick(): void {
  * 导致 dblclick 永不触发——这是「单击」与「双击」冲突的根因。
  */
 function onRowClick(index: number): void {
+  // 触屏长按已进入编辑：松手补发的 click 只用于消费标记，不打开行详情
+  if (pressHandled) {
+    pressHandled = false;
+    cancelRowClick();
+    return;
+  }
   cancelRowClick();
   rowClickTimer = setTimeout(() => {
     rowClickTimer = null;
@@ -583,6 +612,74 @@ function onRowClick(index: number): void {
 }
 
 onBeforeUnmount(cancelRowClick);
+
+/**
+ * 触屏长按进入编辑（触屏没有鼠标双击的等价手势）。
+ * 判定 450ms：按住不动到点即进入编辑；期间手指移动超过 8px 视为滚动/拖动，取消。
+ * 长按触发后浏览器仍会在松手时补发一次 click，用 pressHandled 抑制它，避免顺带打开行详情。
+ */
+const LONG_PRESS_MS = 450;
+const LONG_PRESS_TOLERANCE = 8;
+
+let pressTimer: ReturnType<typeof setTimeout> | null = null;
+let pressOrigin: { x: number; y: number } | null = null;
+/** 已由长按进入编辑，等待消费随后的一次 click */
+let pressHandled = false;
+/** 正在判定的单元格 key（用于按压反馈样式） */
+const pressing = ref<string | null>(null);
+
+/** 取消长按判定（含全局监听器清理） */
+function clearPress(): void {
+  if (pressTimer !== null) {
+    clearTimeout(pressTimer);
+    pressTimer = null;
+  }
+  pressOrigin = null;
+  pressing.value = null;
+  window.removeEventListener('pointermove', onPressMove);
+  window.removeEventListener('pointerup', clearPress);
+  window.removeEventListener('pointercancel', clearPress);
+}
+
+/**
+ * 单元格按下：仅对触控/触笔生效，启动长按计时。
+ * 鼠标路径保持原有的「双击 / Enter / F2」编辑，不受影响。
+ */
+function onCellPointerDown(
+  event: PointerEvent,
+  rowIndex: number,
+  col: string,
+  row: Record<string, unknown>,
+): void {
+  pressHandled = false;
+  clearPress();
+  if (event.pointerType === 'mouse' || editing.value || !canEdit(col)) return;
+  pressOrigin = { x: event.clientX, y: event.clientY };
+  pressing.value = stagedKey(rowIndex, col);
+  pressTimer = setTimeout(() => {
+    // 先清理计时与 window 监听，再进入编辑（pressHandled 保留给紧随其后的 click 消费）
+    clearPress();
+    pressHandled = true;
+    startEdit(rowIndex, col, row);
+  }, LONG_PRESS_MS);
+  // 监听挂在 window：手指移出单元格 / 页面滚动时也能取消，避免滚动途中误进编辑
+  window.addEventListener('pointermove', onPressMove, { passive: true });
+  window.addEventListener('pointerup', clearPress);
+  window.addEventListener('pointercancel', clearPress);
+}
+
+/** 长按判定期内移动：超出容差即视为滚动，取消 */
+function onPressMove(event: PointerEvent): void {
+  if (!pressOrigin || pressTimer === null) return;
+  if (
+    Math.abs(event.clientX - pressOrigin.x) > LONG_PRESS_TOLERANCE ||
+    Math.abs(event.clientY - pressOrigin.y) > LONG_PRESS_TOLERANCE
+  ) {
+    clearPress();
+  }
+}
+
+onBeforeUnmount(clearPress);
 
 /**
  * 双击单元格进入编辑态（Navicat 交互）。
@@ -741,6 +838,12 @@ watch(
   { immediate: true },
 );
 
+/** 结果变化会改变表格宽度（列数），需重新判断横向滚动状态 */
+watch(
+  () => props.result,
+  () => void nextTick(syncScrollState),
+);
+
 /** 过滤文本变化：被过滤掉的行不应再停留在选中态，避免详情面板指向不可见行 */
 watch(
   () => props.filterText,
@@ -755,7 +858,14 @@ onMounted(async () => {
   } catch {
     /* 读取导出插件失败时菜单里就不出现导出项，不阻断使用 */
   }
+  if (tableWrap.value && typeof ResizeObserver !== 'undefined') {
+    wrapObserver = new ResizeObserver(syncScrollState);
+    wrapObserver.observe(tableWrap.value);
+  }
+  syncScrollState();
 });
+
+onBeforeUnmount(() => wrapObserver?.disconnect());
 </script>
 
 <template>
@@ -853,9 +963,24 @@ onMounted(async () => {
           <BaseIcon name="lock" :size="13" />
           <span>冻结首行</span>
         </button>
+        <button
+          v-if="props.result?.rows.length"
+          class="ghost freeze-toggle"
+          type="button"
+          title="用图表查看当前结果"
+          @click="chartOpen = true"
+        >
+          <BaseIcon name="chart" :size="13" />
+          <span>图表</span>
+        </button>
       </div>
       <div class="data-body">
-      <div class="table-wrap" :class="{ 'head-free': !freezeHead }">
+      <div
+        ref="tableWrap"
+        class="table-wrap"
+        :class="{ 'head-free': !freezeHead, 'scrolled-x': scrolledX }"
+        @scroll="syncScrollState"
+      >
         <table>
           <thead>
             <tr>
@@ -905,6 +1030,7 @@ onMounted(async () => {
                   'cell-null': isNull(item.row, col) && !stagedChange(item.index, col),
                   'cell-staged': Boolean(stagedChange(item.index, col)),
                   'is-editing': editing && editing.rowIndex === item.index && editing.col === col,
+                  'is-pressing': pressing === `${item.index}:${col}`,
                   editable: canEdit(col),
                   'col-frozen': freezeFirst && col === columns[0],
                 }"
@@ -913,10 +1039,11 @@ onMounted(async () => {
                   stagedChange(item.index, col)
                     ? '已修改（未提交）· 双击继续编辑'
                     : canEdit(col)
-                      ? '双击或 Enter 编辑 · 右键复制'
+                      ? '双击或 Enter 编辑 · 触屏长按编辑 · 右键复制'
                       : '右键复制'
                 "
                 tabindex="0"
+                @pointerdown="onCellPointerDown($event, item.index, col, item.row)"
                 @dblclick="startEdit(item.index, col, item.row)"
                 @keydown.enter.prevent="canEdit(col) && startEdit(item.index, col, item.row)"
                 @keydown.f2.prevent="canEdit(col) && startEdit(item.index, col, item.row)"
@@ -1050,5 +1177,14 @@ onMounted(async () => {
         </button>
       </div>
     </template>
+
+    <!-- 结果图表（弹窗，避免挤占表格空间） -->
+    <Modal :open="chartOpen" title="结果图表" body-class="rchart-modal" @close="chartOpen = false">
+      <ResultChart
+        v-if="props.result"
+        :result="props.result"
+        :column-types="props.columnTypes"
+      />
+    </Modal>
   </div>
 </template>

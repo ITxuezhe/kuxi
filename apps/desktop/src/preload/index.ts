@@ -14,6 +14,7 @@ import type {
   ExportOutcome,
   ExportWithRequest,
   IConnectionConfig,
+  UpdateStatus,
 } from '@kuxi/shared';
 
 /**
@@ -69,6 +70,21 @@ const api = {
     ipcRenderer.invoke(IPC.AiTest, draft),
   aiChat: (messages: AiMessage[]): Promise<AiChatOutcome> =>
     ipcRenderer.invoke(IPC.AiChat, messages),
+
+  // ---- 自动更新 ----
+  checkUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.UpdateCheck),
+  downloadUpdate: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.UpdateDownload),
+  installUpdate: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.UpdateInstall),
+  updateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.UpdateGetStatus),
+  appVersion: (): Promise<string> => ipcRenderer.invoke(IPC.AppVersion),
+  /** 订阅主进程推送的更新状态；返回取消订阅函数 */
+  onUpdateStatus: (cb: (s: UpdateStatus) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, s: UpdateStatus): void => cb(s);
+    ipcRenderer.on(IPC.UpdateStatus, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.UpdateStatus, handler);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld('kuxi', api);

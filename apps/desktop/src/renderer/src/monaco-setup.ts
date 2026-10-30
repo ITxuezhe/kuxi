@@ -14,10 +14,12 @@
  * - getWorker 只返回 editorWorker，避免其它语言 worker 被错误拉起（我们只用 sql）。
  */
 /// <reference types="vite/client" />
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
-import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution';
-import 'monaco-editor/min/vs/editor/editor.main.css';
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+// monaco 0.57 起 package.json 用 exports 把子路径映射到 esm/vs，
+// 因此必须写「包内相对路径」（monaco-editor/editor/...），不能带 esm/vs 前缀；
+// 样式由 ESM 各模块自带的 *.css 导入（编辑器内核已聚合），无需再单独引 editor.main.css。
+import * as monaco from 'monaco-editor/editor/editor.api';
+import 'monaco-editor/languages/definitions/sql/register';
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import type { ThemeName } from './composables/useTheme';
 
 // 全局注册 worker（只注册一次）

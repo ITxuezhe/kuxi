@@ -36,6 +36,8 @@ const emit = defineEmits<{
   /** 右键「设计表」：在设计标签页中打开该表（v1 仍为新建向导，预填表名） */
   (e: 'design', table: string): void;
   (e: 'drop', table: string): void;
+  /** 可视化查询构建器（table 为空表示不预选，由构建器自动选第一张表） */
+  (e: 'build', table: string): void;
 }>();
 
 const { copy } = useClipboard();
@@ -121,6 +123,7 @@ function onTableContextMenu(event: MouseEvent, table: string): void {
     { label: '打开数据', action: () => openTable(table) },
     { label: '设计表', action: () => emit('design', table) },
     { label: '生成 SELECT 查询', action: () => pickTable(table) },
+    { label: '可视化查询', action: () => emit('build', table) },
     { label: '复制表名', action: () => void copyTableName(table) },
     { label: '删除表', separator: true, danger: true, action: () => emit('drop', table) },
   ]);
@@ -158,6 +161,16 @@ watch(
         @click="load"
       >
         <BaseIcon name="refresh" :size="16" />
+      </button>
+      <button
+        class="icon-btn"
+        type="button"
+        :disabled="!connected"
+        title="可视化查询构建器"
+        aria-label="可视化查询构建器"
+        @click="emit('build', '')"
+      >
+        <BaseIcon name="filter" :size="16" />
       </button>
       <button
         class="icon-btn"

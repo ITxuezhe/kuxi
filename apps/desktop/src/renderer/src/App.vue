@@ -5,7 +5,7 @@
  * 主区为标签工作台（Workbench）：查询 / 数据:表 / 设计:表 三类标签可多开。
  * 执行逻辑集中在 useWorkbench 状态机；危险 SQL 与 AI 解释通过 handler 上抛到本组件的弹窗。
  */
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import ConnectionForm from './components/ConnectionForm.vue';
 import Workbench from './components/Workbench.vue';
 import ThemeSwitcher from './components/ThemeSwitcher.vue';
@@ -14,11 +14,15 @@ import ConfirmDialog from './components/ConfirmDialog.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import AiPanel from './components/AiPanel.vue';
 import AiSettings from './components/AiSettings.vue';
+import QueryBuilder from './components/QueryBuilder.vue';
 import SchemaTree from './components/SchemaTree.vue';
 import InfoDialog from './components/InfoDialog.vue';
 import ContextMenu from './components/ContextMenu.vue';
 import Modal from './components/Modal.vue';
 import BaseIcon from './components/BaseIcon.vue';
+import TemplatePicker from './components/TemplatePicker.vue';
+import GuideModal from './components/GuideModal.vue';
+import UpdateBanner from './components/UpdateBanner.vue';
 import { useToast } from './composables/useToast';
 import { openContextMenu } from './composables/useContextMenu';
 import { refreshAiConfig } from './composables/useAi';
@@ -56,6 +60,33 @@ const pendingTab = ref<WorkbenchTab | null>(null);
 /** AI 抽屉与配置 */
 const aiOpen = ref(false);
 const aiSettingsOpen = ref(false);
+
+/** 可视化查询构建器 */
+const builderOpen = ref(false);
+/** 构建器预选表（空串表示不预选） */
+const builderTable = ref('');
+
+/** 操作模板与新手引导 */
+const templateOpen = ref(false);
+const guideOpen = ref(false);
+const GUIDE_SEEN_KEY = 'kuxi.guide.seen';
+/** 应用版本号（展示在引导页脚） */
+const appVersion = ref('');
+
+/** 窄屏（≤820px）连接侧栏改为抽屉，此状态控制抽屉开合 */
+const sidebarOpen = ref(false);
+/** ☰ 触发按钮：关闭抽屉时焦点归还到这里，避免焦点留在已隐藏的侧栏里 */
+const sidebarToggleEl = ref<HTMLButtonElement | null>(null);
+
+/**
+ * 关闭连接抽屉。
+ * @param restoreFocus 是否把焦点还给 ☰（Esc / 点遮罩关闭时为 true；导航到主区后不抢焦点）
+ */
+function closeSidebar(restoreFocus = false): void {
+  if (!sidebarOpen.value) return;
+  sidebarOpen.value = false;
+  if (restoreFocus) sidebarToggleEl.value?.focus();
+}
 
 /** AI 解释弹窗 */
 const infoOpen = ref(false);
@@ -192,6 +223,8 @@ function selectConnection(id: string): void {
  * @param item 连接项
  */
 function onConnClick(item: ConnectionItem): void {
+  // 窄屏抽屉模式下点击后收起，避免遮住主工作区（宽屏时该状态无副作用）
+  closeSidebar();
   if (!item.active) {
     void connectExisting(item.id);
     return;
@@ -471,10 +504,72 @@ function applySql(text: string): void {
   toast.success('已填入编辑器，确认后再执行');
 }
 
+/** 结构树点选并插入 SQL：窄屏下先收起抽屉，否则抽屉会遮住编辑器（与其它树的动作一致） */
+function onSchemaPick(text: string): void {
+  closeSidebar();
+  applySql(text);
+}
+
 /** AI 面板「执行」：填入查询标签并立即执行 */
 function runAi(text: string): void {
   wb.applyToActiveQuery(text);
   wb.runActive();
+}
+
+/** 打开可视化查询构建器；窄屏下先收起侧栏抽屉 */
+function openBuilder(table = ''): void {
+  closeSidebar();
+  builderTable.value = table;
+  builderOpen.value = true;
+}
+
+/** 构建器「填入编辑器」：关闭弹窗并填入当前查询标签 */
+function onBuilderApply(sql: string): void {
+  builderOpen.value = false;
+  applySql(sql);
+}
+
+/** 构建器「执行」：关闭弹窗，填入并立即运行 */
+function onBuilderRun(sql: string): void {
+  builderOpen.value = false;
+  wb.applyToActiveQuery(sql);
+  wb.runActive();
+}
+
+/** 打开操作模板面板 */
+function openTemplates(): void {
+  closeSidebar();
+  templateOpen.value = true;
+}
+
+/** 选中模板：填入编辑器（不自动执行，危险语句仍走确认弹窗） */
+function useTemplate(sql: string): void {
+  templateOpen.value = false;
+  applySql(sql);
+}
+
+/** 关闭引导并记下「已看过」，下次不再自动弹出 */
+function closeGuide(): void {
+  guideOpen.value = false;
+  try {
+    localStorage.setItem(GUIDE_SEEN_KEY, '1');
+  } catch {
+    // localStorage 不可用时忽略：只是下次仍会弹一次，不影响功能
+  }
+}
+
+/** 手动检查更新（引导页 / 关于入口）：结果通过 toast + 右下横幅展示 */
+async function checkUpdates(): Promise<void> {
+  if (!window.kuxi) return;
+  try {
+    const s = await window.kuxi.checkUpdates();
+    if (s.state === 'available') toast.success(`发现新版本 v${s.version}，可在右下角下载`);
+    else if (s.state === 'not-available') toast.success(`已是最新版本 v${s.currentVersion}`);
+    else if (s.state === 'disabled') toast.info(s.message ?? '当前环境不支持自动更新');
+    else if (s.state === 'error') toast.error(s.message ?? '检查更新失败');
+  } catch (e) {
+    toast.error(`检查更新失败：${(e as Error).message}`);
+  }
 }
 
 /** 表结构右键「删除表」：开一个查询标签放 DROP 并执行（会触发危险确认） */
@@ -502,6 +597,44 @@ function onCancelExecute(): void {
   toast.info('已取消执行');
 }
 
+/** 窄屏断点（与 styles.css 中抽屉断点 820px 保持一致） */
+const NARROW_MQ = '(max-width: 820px)';
+
+/**
+ * 全局 Esc：窄屏连接抽屉打开时关闭。
+ * - 若弹窗 / 右键菜单 / 主题面板正开着，Esc 交给它们自己处理（否则一次 Esc 会连关两层，
+ *   甚至弹窗 busy 拒绝关闭时背后的抽屉先消失）
+ * - 关闭后焦点归还 ☰，避免焦点停在已隐藏的侧栏控件上
+ */
+function onAppKeydown(e: KeyboardEvent): void {
+  if (e.key !== 'Escape' || !sidebarOpen.value) return;
+  if (document.querySelector('.modal-mask, .ctx-menu, .theme-panel')) return;
+  closeSidebar(true);
+}
+
+/** 视口拉宽到桌面断点后抽屉语义不再存在：复位状态，避免留下不可见遮罩与过期的 aria-expanded */
+function onNarrowMqChange(e: MediaQueryListEvent): void {
+  if (!e.matches) closeSidebar();
+}
+
+const narrowMq = window.matchMedia(NARROW_MQ);
+
+onMounted(() => {
+  window.addEventListener('keydown', onAppKeydown);
+  narrowMq.addEventListener('change', onNarrowMqChange);
+  // 首次启动自动展示引导；已看过（localStorage 标记）则不再打扰
+  try {
+    if (!localStorage.getItem(GUIDE_SEEN_KEY)) guideOpen.value = true;
+  } catch {
+    // localStorage 不可用时不自动弹出，用户可从顶栏「?」手动打开
+  }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onAppKeydown);
+  narrowMq.removeEventListener('change', onNarrowMqChange);
+});
+
 onMounted(async () => {
   // 桌面桥接缺失（Electron preload 未加载 / 在纯浏览器里打开渲染页）时，
   // 所有 IPC 调用都会报 "Cannot read properties of undefined"，
@@ -513,6 +646,11 @@ onMounted(async () => {
     return;
   }
   void refresh();
+  try {
+    appVersion.value = await window.kuxi.appVersion();
+  } catch {
+    /* 版本号取不到只影响展示，不影响检查更新 */
+  }
   try {
     const settings = await window.kuxi.getSettings();
     readOnly.value = settings.readOnly;
@@ -530,6 +668,19 @@ onMounted(async () => {
   <div class="app">
     <!-- 顶部工具栏：品牌 / 当前连接 / 只读开关 / AI / 外观设置 / 执行 -->
     <header class="topbar">
+      <button
+        ref="sidebarToggleEl"
+        class="ghost icon-btn sidebar-toggle"
+        type="button"
+        :aria-expanded="sidebarOpen"
+        aria-controls="app-sidebar"
+        aria-label="展开/收起连接列表"
+        title="连接列表"
+        @click="sidebarOpen = !sidebarOpen"
+      >
+        <BaseIcon name="menu" :size="16" />
+      </button>
+
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><BaseIcon name="logo" :size="18" /></span>
         <span>库犀</span>
@@ -565,6 +716,33 @@ onMounted(async () => {
           <BaseIcon name="sparkles" :size="15" />
           <span>AI</span>
         </button>
+        <button
+          class="ghost icon-lead"
+          type="button"
+          title="可视化查询构建器：勾字段、加筛选，自动生成 SQL"
+          @click="openBuilder('')"
+        >
+          <BaseIcon name="filter" :size="15" />
+          <span>构建</span>
+        </button>
+        <button
+          class="ghost icon-lead"
+          type="button"
+          title="操作模板：常用查询、清理重复、补空值"
+          @click="openTemplates"
+        >
+          <BaseIcon name="file" :size="15" />
+          <span>模板</span>
+        </button>
+        <button
+          class="icon-btn"
+          type="button"
+          title="使用指南"
+          aria-label="使用指南"
+          @click="guideOpen = true"
+        >
+          <BaseIcon name="info" :size="16" />
+        </button>
         <ThemeSwitcher />
         <button
           class="primary"
@@ -581,7 +759,7 @@ onMounted(async () => {
     </header>
 
     <div class="layout">
-      <aside class="sidebar">
+      <aside id="app-sidebar" class="sidebar" :class="{ 'is-open': sidebarOpen }">
         <div class="sidebar-sticky">
         <div class="sidebar-head">
           <h2>
@@ -696,13 +874,17 @@ onMounted(async () => {
           :connected="Boolean(currentConnection?.active)"
           :db-type="currentConnection?.type || ''"
           :refresh-token="wb.schemaRefreshToken.value"
-          @pick="applySql"
-          @open="(table: string, pk: string[]) => wb.openData(table, pk)"
-          @create="() => wb.openDesign()"
-          @design="(table: string) => wb.openDesign(table)"
+          @pick="onSchemaPick"
+          @open="(table: string, pk: string[]) => { closeSidebar(); wb.openData(table, pk) }"
+          @create="() => { closeSidebar(); wb.openDesign() }"
+          @design="(table: string) => { closeSidebar(); wb.openDesign(table) }"
+          @build="openBuilder"
           @drop="onDropTable"
         />
       </aside>
+
+      <!-- 窄屏抽屉遮罩：点击关闭侧栏 -->
+      <div v-if="sidebarOpen" class="drawer-backdrop" aria-hidden="true" @click="closeSidebar(true)" />
 
       <!-- 主区：标签工作台（查询 / 数据 / 设计） -->
       <main class="main">
@@ -734,6 +916,35 @@ onMounted(async () => {
 
     <!-- AI 配置 -->
     <AiSettings :open="aiSettingsOpen" @close="aiSettingsOpen = false" />
+
+    <!-- 可视化查询构建器 -->
+    <Modal :open="builderOpen" title="查询构建器" body-class="qb-modal" @close="builderOpen = false">
+      <QueryBuilder
+        :open="builderOpen"
+        :connection-id="activeId"
+        :db-type="dbType"
+        :connected="connected"
+        :initial-table="builderTable"
+        @close="builderOpen = false"
+        @apply="onBuilderApply"
+        @run="onBuilderRun"
+      />
+    </Modal>
+
+    <!-- 操作模板 -->
+    <Modal :open="templateOpen" title="操作模板" body-class="tpl-modal" @close="templateOpen = false">
+      <TemplatePicker
+        :open="templateOpen"
+        :db-type="dbType"
+        @close="templateOpen = false"
+        @use="useTemplate"
+      />
+    </Modal>
+
+    <!-- 新手引导 -->
+    <Modal :open="guideOpen" title="3 分钟上手库犀" body-class="guide-modal" @close="closeGuide">
+      <GuideModal :open="guideOpen" :version="appVersion" @check="checkUpdates" @close="closeGuide" />
+    </Modal>
 
     <!-- AI 解释结果 -->
     <InfoDialog :open="infoOpen" :title="infoTitle" :content="infoContent" @close="infoOpen = false" />
@@ -809,5 +1020,8 @@ onMounted(async () => {
 
     <!-- 全局轻提示 -->
     <ToastHost />
+
+    <!-- 自动更新提示（右下角，仅在发现新版本/下载/就绪时出现） -->
+    <UpdateBanner />
   </div>
 </template>

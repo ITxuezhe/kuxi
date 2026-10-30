@@ -234,7 +234,7 @@ export function formatSql(sql: string, dialect: DbType): string {
 }
 
 /** 标识符引用（MySQL 反引号，其余双引号） */
-function quoteIdent(dialect: DbType, name: string): string {
+export function quoteIdent(dialect: DbType, name: string): string {
   if (dialect === 'mysql') return `\`${name.replace(/`/g, '``')}\``;
   return `"${name.replace(/"/g, '""')}"`;
 }

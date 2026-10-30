@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --filter @kuxi/desktop dev",
     "build": "pnpm --filter @kuxi/desktop build",
+    "dist": "pnpm --filter @kuxi/desktop dist",
     "test:core": "pnpm --filter @kuxi/core test",
     "test:desktop": "pnpm --filter @kuxi/desktop test",
     "harness": "pnpm --filter @kuxi/core harness",

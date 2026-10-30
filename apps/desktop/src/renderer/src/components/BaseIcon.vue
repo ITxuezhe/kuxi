@@ -40,6 +40,10 @@ export type IconName =
   | 'sort'
   | 'link'
   | 'info'
+  | 'menu'
+  | 'filter'
+  | 'chart'
+  | 'file'
   | 'logo';
 
 const props = withDefaults(
@@ -63,6 +67,7 @@ const PATHS: Record<IconName, string> = {
     '<path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z"/>',
   play: '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  menu: '<path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>',
   refresh:
     '<path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.36 2.64L21 8"/><path d="M21 3v5h-5"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
@@ -90,6 +95,11 @@ const PATHS: Record<IconName, string> = {
   link:
     '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  filter: '<path d="M3 4h18l-7 8v6l-4 2v-8z"/>',
+  chart:
+    '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
+  file:
+    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/>',
   logo:
     '<ellipse cx="12" cy="5.5" rx="8.5" ry="2.8"/><path d="M3.5 5.5v13c0 1.55 3.8 2.8 8.5 2.8s8.5-1.25 8.5-2.8v-13"/><path d="M10 8.4a3 3 0 1 1 4.2 2.7c-.6.4-1.2.9-1.2 1.8"/><path d="M12 16.4h.01"/>',
 };

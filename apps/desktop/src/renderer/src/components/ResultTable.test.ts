@@ -86,6 +86,68 @@ describe('单击行详情 / 双击编辑', () => {
   });
 });
 
+describe('触屏长按编辑', () => {
+  /**
+   * 派发 pointer 事件（jsdom 无 PointerEvent，VTU 对未登记的事件类型也不会补属性，
+   * 因此手写 Event 再挂 pointerType / clientX/Y）。
+   */
+  function pointer(el: Element, type: string, props: Record<string, unknown> = {}): void {
+    const ev = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      clientX: Number(props.clientX ?? 10),
+      clientY: Number(props.clientY ?? 10),
+    });
+    Object.defineProperty(ev, 'pointerType', { value: props.pointerType ?? 'touch' });
+    el.dispatchEvent(ev);
+  }
+
+  it('长按 450ms 进入编辑，松手补发的 click 不会打开行详情', async () => {
+    vi.useFakeTimers();
+    const wrapper = mountGrid();
+    const cell = firstCell(wrapper);
+
+    pointer(cell.element, 'pointerdown');
+    vi.advanceTimersByTime(500);
+    await wrapper.vm.$nextTick();
+    expect(cell.find('.cell-input').exists()).toBe(true);
+
+    // 触屏松手仍会派发 click，此时应被抑制
+    pointer(cell.element, 'pointerup');
+    await wrapper.findAll('tbody tr.data-row')[0]!.trigger('click');
+    vi.advanceTimersByTime(300);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.row-detail').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('判定期内移动超过 8px（视为滚动）不进入编辑', async () => {
+    vi.useFakeTimers();
+    const wrapper = mountGrid();
+    const cell = firstCell(wrapper);
+
+    pointer(cell.element, 'pointerdown', { clientX: 10, clientY: 10 });
+    vi.advanceTimersByTime(200);
+    pointer(cell.element, 'pointermove', { clientX: 10, clientY: 40 });
+    vi.advanceTimersByTime(500);
+    await wrapper.vm.$nextTick();
+    expect(cell.find('.cell-input').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('鼠标按下不触发长按（桌面仍走双击路径）', async () => {
+    vi.useFakeTimers();
+    const wrapper = mountGrid();
+    const cell = firstCell(wrapper);
+
+    pointer(cell.element, 'pointerdown', { pointerType: 'mouse' });
+    vi.advanceTimersByTime(500);
+    await wrapper.vm.$nextTick();
+    expect(cell.find('.cell-input').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
 describe('行详情布局', () => {
   it('每个详情条目为「字段名一行 + 值一行」的两段结构', async () => {
     vi.useFakeTimers();
@@ -120,6 +182,26 @@ describe('冻结首行开关', () => {
 
     await headBtn().trigger('click');
     expect(wrap().classes()).not.toContain('head-free');
+    wrapper.unmount();
+  });
+});
+
+describe('触屏横向滚动提示', () => {
+  it('横向滑动后 table-wrap 加上 scrolled-x，回到起点后移除', async () => {
+    const wrapper = mountGrid();
+    const wrap = wrapper.find('.table-wrap');
+    const el = wrap.element as HTMLElement;
+
+    expect(wrap.classes()).not.toContain('scrolled-x');
+
+    el.scrollLeft = 40;
+    await wrap.trigger('scroll');
+    expect(wrap.classes()).toContain('scrolled-x');
+
+    el.scrollLeft = 0;
+    await wrap.trigger('scroll');
+    expect(wrap.classes()).not.toContain('scrolled-x');
+
     wrapper.unmount();
   });
 });
