@@ -23,6 +23,10 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# ---- 本地审查/临时产物 ----
+.review_results.json
+_tmp_*
+
 # ---- 编辑器与本地工具 ----
 .idea/
 .vscode/*
