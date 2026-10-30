@@ -69,13 +69,7 @@ pnpm harness        # 运行驱动 harness 演示
 
 ## 文档
 
-| 文档 | 内容 |
-|---|---|
-| [Electron数据库软件可行性分析.md](./Electron数据库软件可行性分析.md) | 技术选型与风险评估 |
-| [整体总结与分阶段开发方案.md](./整体总结与分阶段开发方案.md) | 产品定位、竞品借鉴、分阶段路线 |
-| [需求细化-AI配置与小白UX.md](./需求细化-AI配置与小白UX.md) | AI 配置三模式与新手体验设计 |
-| [PHASE0_验证报告.md](./PHASE0_验证报告.md) / [PHASE1](./PHASE1_交付报告.md) / [PHASE2](./PHASE2_交付报告.md) | 各阶段交付与验收记录 |
-| [PHASE3_连接管理重设计.md](./PHASE3_连接管理重设计.md) | 连接管理交互重设计 |
+设计决策与阶段报告属于内部资料，不随仓库公开；对外可参考上方「架构要点」与 [Releases](https://github.com/ITxuezhe/kuxi/releases) 的更新日志。
 
 ## 路线图
 
