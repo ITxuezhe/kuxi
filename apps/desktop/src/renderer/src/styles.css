@@ -879,7 +879,8 @@ body.editor-resizing * {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  padding: 3px var(--gap-sm);
+  /* 竖向给足呼吸：这条提示条上下贴死会显得整块很挤 */
+  padding: 6px var(--gap-sm);
   border-top: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--muted);
@@ -1735,6 +1736,12 @@ button.ghost.is-on {
   transform: translateY(8px) scale(0.98);
   opacity: 0;
 }
+/* 极窄窗口：遮罩内边距收窄，给弹窗内容让出宽度（24px 边距在小窗上占比过大） */
+@media (max-width: 560px) {
+  .modal-mask {
+    padding: 12px;
+  }
+}
 button.danger {
   background: var(--danger);
   border-color: var(--danger);
@@ -2137,6 +2144,98 @@ button.danger:hover:not(:disabled) {
   font-size: calc(var(--font-sm) * 0.95);
   line-height: 1.4;
 }
+
+/* ---------- 对象树分组（视图 / 过程与函数 / 触发器） ---------- */
+.schema-group {
+  margin-top: var(--gap-sm);
+}
+.schema-group-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px var(--pad-panel);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  cursor: pointer;
+}
+.schema-group-head:hover {
+  color: var(--text);
+  background: var(--panel-3);
+}
+.schema-group-head .count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  letter-spacing: 0;
+  text-transform: none;
+}
+/* 叶子行：无字段列表的轻量行（视图/过程/触发器条目） */
+.schema-list.is-leaf-list {
+  padding: 0 var(--pad-panel) 2px calc(var(--pad-panel) + 6px);
+}
+.schema-leaf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.schema-leaf:hover {
+  background: var(--panel-3);
+}
+.schema-leaf .leaf-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schema-leaf .leaf-meta {
+  color: var(--muted);
+  font-size: var(--font-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+}
+/* 类型徽标：方形小字（V=视图 ƒ=函数 P=过程 T=触发器），不依赖 emoji/字体图标 */
+.leaf-glyph {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.leaf-glyph.leaf-view {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.leaf-glyph.leaf-trg {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
 .col-name {
   color: var(--text);
 }
@@ -2462,8 +2561,8 @@ button.danger:hover:not(:disabled) {
 }
 /* 连接弹窗比通用弹窗宽一档：三列字段/三张类型卡才不至于拥挤 */
 .conn-modal {
-  width: min(640px, 94vw);
-  max-width: min(640px, 94vw);
+  width: min(640px, calc(100vw - 48px));
+  max-width: min(640px, calc(100vw - 48px));
   /* 由 .modal-body 单独滚动，弹窗本身不再滚动，头部与操作条常驻 */
   overflow: hidden;
 }
@@ -2489,18 +2588,44 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- 可视化查询构建器 ---------- */
 .qb-modal {
-  width: min(860px, 94vw);
+  /* 宽度上限与遮罩 24px 边距精确对应：窄窗口时两侧始终留足 24px */
+  width: min(860px, calc(100vw - 48px));
 }
 .qb {
-  display: flex;
-  flex-direction: column;
+  /* 双列网格：宽窗口下「筛选|排序」「分组|行数」并排，降低弹窗整体高度；
+     通栏块（表单行/展示字段/SQL 预览/底部）用 .qb-span2，窄窗口回落单列 */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   gap: var(--gap);
+}
+.qb-head-row,
+.qb-foot,
+.qb-span2 {
+  grid-column: 1 / -1;
+}
+/* 等高拉伸会让只有一行提示的卡片出现大片空白，改为顶对齐由内容决定高度 */
+.qb-col {
+  align-self: start;
 }
 .qb-head-row {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
   flex-wrap: wrap;
+}
+/* 表选择器弹性占满主空间（上限 480px 防止超宽表单比例失衡），
+   字段计数推到行尾，避免 860px 宽度下右侧大片留白 */
+.qb-head-row .qb-field {
+  flex: 1 1 320px;
+  max-width: 480px;
+}
+.qb-head-row .qb-field select {
+  width: 100%;
+  min-width: 0;
+}
+.qb-head-row .qb-hint {
+  margin-left: auto;
 }
 .qb-field {
   display: flex;
@@ -2619,10 +2744,13 @@ button.danger:hover:not(:disabled) {
   gap: var(--gap-sm);
   margin-left: auto;
 }
-@media (max-width: 640px) {
-  .qb-modal {
-    width: 94vw;
+/* 窄窗口：双列卡片放不下筛选行的三个控件，回落单列（通栏类保持通栏） */
+@media (max-width: 760px) {
+  .qb {
+    grid-template-columns: 1fr;
   }
+}
+@media (max-width: 640px) {
   .qb-row select,
   .qb-input {
     flex: 1 1 100%;
@@ -2637,8 +2765,8 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- CSV / Excel 导入向导 ---------- */
 .import-modal {
-  width: min(900px, 96vw);
-  max-width: min(900px, 96vw);
+  width: min(900px, calc(100vw - 48px));
+  max-width: min(900px, calc(100vw - 48px));
   overflow: hidden;
 }
 .import-modal .modal-body {
@@ -3060,7 +3188,8 @@ button.danger:hover:not(:disabled) {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  padding: 0 8px;
+  /* 顶部留 4px 呼吸，标签不再顶死上边框 */
+  padding: 4px 8px 0;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   overflow-x: auto;
@@ -3072,7 +3201,7 @@ button.danger:hover:not(:disabled) {
   gap: 6px;
   flex-shrink: 0;
   max-width: 200px;
-  padding: 5px 8px 5px 10px;
+  padding: 6px 8px 6px 10px;
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: 6px 6px 0 0;
@@ -3559,7 +3688,7 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- 结果图表 ---------- */
 .rchart-modal {
-  width: min(760px, 94vw);
+  width: min(760px, calc(100vw - 48px));
 }
 .rchart {
   display: flex;
@@ -3644,7 +3773,7 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- 操作模板 ---------- */
 .tpl-modal {
-  width: min(820px, 94vw);
+  width: min(820px, calc(100vw - 48px));
 }
 .tpl {
   display: flex;
@@ -3671,7 +3800,11 @@ button.danger:hover:not(:disabled) {
 }
 .tpl-group-title {
   margin: 0;
+  /* 分组标题退为辅助层级：弱化颜色 + 加重字重，与卡片标题（正文色）拉开层次 */
+  color: var(--muted);
   font-size: var(--font-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .tpl-cards {
   display: grid;
@@ -3682,7 +3815,7 @@ button.danger:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
+  gap: 4px;
   padding: var(--pad-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -3717,8 +3850,12 @@ button.danger:hover:not(:disabled) {
 .tpl-card-sql {
   display: block;
   width: 100%;
+  margin-top: 4px;
   max-height: 76px;
   overflow: hidden;
+  /* 底部渐隐代替生硬截断：被裁掉的 SQL 不再出现"切一半"的断头行 */
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
   color: var(--muted);
   font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 11px;
@@ -3737,7 +3874,7 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- 新手引导 ---------- */
 .guide-modal {
-  width: min(720px, 94vw);
+  width: min(720px, calc(100vw - 48px));
 }
 .guide {
   display: flex;

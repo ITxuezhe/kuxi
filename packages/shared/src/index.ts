@@ -188,6 +188,44 @@ export interface TableInfo {
 
 export interface DatabaseSchema {
   tables: TableInfo[];
+  /** 视图（驱动支持时才返回） */
+  views?: ViewInfo[];
+  /** 存储过程 / 函数（驱动支持时才返回） */
+  routines?: RoutineInfo[];
+  /** 触发器（驱动支持时才返回） */
+  triggers?: TriggerInfo[];
+}
+
+/** 视图 */
+export interface ViewInfo {
+  name: string;
+  /** 定义 SQL：MySQL/PG 为 SELECT 语句体，SQLite 为完整 CREATE VIEW 语句 */
+  definition: string;
+}
+
+/** 存储过程 / 函数（SQLite 没有这类对象） */
+export interface RoutineInfo {
+  name: string;
+  kind: 'procedure' | 'function';
+  /** 参数签名，展示用（如 "(id INTEGER, name TEXT)"） */
+  args?: string;
+  /** 返回类型（仅函数） */
+  returnType?: string;
+  /** 定义体，驱动能拿到就带出来 */
+  definition?: string;
+}
+
+/** 触发器 */
+export interface TriggerInfo {
+  name: string;
+  /** 触发时机：BEFORE / AFTER / INSTEAD OF */
+  timing: string;
+  /** 触发事件：INSERT / UPDATE / DELETE */
+  event: string;
+  /** 挂靠的表名 */
+  table: string;
+  /** 完整定义 SQL */
+  definition: string;
 }
 
 /** 归一化错误码 */

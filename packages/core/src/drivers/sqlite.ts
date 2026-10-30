@@ -6,6 +6,8 @@ import type {
   DatabaseSchema,
   ColumnInfo,
   TableInfo,
+  ViewInfo,
+  TriggerInfo,
 } from '@kuxi/shared';
 import type { IDriver, DriverQueryOptions } from './base';
 
@@ -127,7 +129,27 @@ export class SqliteDriver implements IDriver {
       }));
       tables.push({ name, columns });
     }
-    return { tables };
+
+    // 视图与触发器都在 sqlite_master 里，各一次查询全量取回。
+    // SQLite 没有存储过程/函数，routines 留空。
+    const views: ViewInfo[] = (
+      await this.query(
+        `SELECT name, sql FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%' ORDER BY name;`,
+      )
+    ).rows.map((r) => ({ name: String(r.name), definition: String(r.sql ?? '') }));
+
+    const triggers: TriggerInfo[] = (
+      await this.query(
+        `SELECT name, sql, tbl_name FROM sqlite_master WHERE type='trigger' ORDER BY name;`,
+      )
+    ).rows.map((r) => ({
+      name: String(r.name),
+      definition: String(r.sql ?? ''),
+      ...parseTriggerHeader(String(r.sql ?? '')),
+      table: String(r.tbl_name ?? ''),
+    }));
+
+    return { tables, views, triggers };
   }
 
   /**
@@ -149,4 +171,19 @@ export class SqliteDriver implements IDriver {
 /** 用双引号安全包裹标识符（防注入） */
 function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
+}
+
+/**
+ * 从 CREATE TRIGGER 语句解析触发时机与事件（sqlite_master 没有结构化字段）。
+ * 解析失败给空字符串，UI 侧降级只显示名字。
+ */
+function parseTriggerHeader(sql: string): { timing: string; event: string } {
+  const m = sql.match(
+    /\b(BEFORE|AFTER|INSTEAD\s+OF)\s+(INSERT|UPDATE(?:\s+OF\s+\S+)?|DELETE)\b/i,
+  );
+  if (!m) return { timing: '', event: '' };
+  return {
+    timing: m[1].toUpperCase().replace(/\s+/g, ' '),
+    event: m[2].toUpperCase().replace(/\s+/g, ' '),
+  };
 }

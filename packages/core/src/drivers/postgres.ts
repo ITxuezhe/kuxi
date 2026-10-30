@@ -6,6 +6,9 @@ import type {
   DatabaseSchema,
   ColumnInfo,
   TableInfo,
+  ViewInfo,
+  RoutineInfo,
+  TriggerInfo,
 } from '@kuxi/shared';
 import type { IDriver, DriverQueryOptions } from './base';
 import { openSshTunnel, type SshTunnel } from '../ssh-tunnel';
@@ -252,7 +255,63 @@ export class PostgresDriver implements IDriver {
       }));
       tables.push({ name, columns });
     }
-    return { tables };
+
+    // 视图 / 函数与过程 / 触发器：pg 目录表各一次全量查询。
+    // PG 有 schema 概念，与 listTables 保持一致只看 public。
+    const views: ViewInfo[] = (
+      await this.query(
+        `SELECT viewname AS name, definition FROM pg_views
+         WHERE schemaname = 'public' ORDER BY viewname`,
+      )
+    ).rows.map((r) => ({ name: String(r.name), definition: String(r.definition ?? '') }));
+
+    // 用 pg_proc 而非 information_schema.routines：后者对重载函数返回多行同名记录。
+    // prokind f=普通函数 p=过程；排除聚合(a)与窗口(w)，它们的 functiondef 会报错。
+    const routines: RoutineInfo[] = (
+      await this.query(
+        `SELECT p.proname AS name,
+                CASE WHEN p.prokind = 'p' THEN 'procedure' ELSE 'function' END AS kind,
+                pg_get_function_identity_arguments(p.oid) AS args,
+                pg_get_function_result(p.oid) AS return_type,
+                pg_get_functiondef(p.oid) AS definition
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+         WHERE n.nspname = 'public' AND p.prokind IN ('f', 'p')
+         ORDER BY p.proname`,
+      )
+    ).rows.map((r) => ({
+      name: String(r.name),
+      kind: r.kind === 'procedure' ? 'procedure' as const : 'function' as const,
+      args: r.args ? String(r.args) : undefined,
+      returnType: r.return_type === null || r.return_type === undefined ? undefined : String(r.return_type),
+      definition: r.definition === null || r.definition === undefined ? undefined : String(r.definition),
+    }));
+
+    // tgisinternal 排除 PG 内建约束触发器（外键实现），只留用户自建的
+    const triggers: TriggerInfo[] = (
+      await this.query(
+        `SELECT t.tgname AS name,
+                pg_get_triggerdef(t.oid) AS definition,
+                c.relname AS tbl
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public' AND NOT t.tgisinternal
+         ORDER BY t.tgname`,
+      )
+    ).rows.map((r) => {
+      const def = String(r.definition ?? '');
+      const m = def.match(/\b(BEFORE|AFTER|INSTEAD\s+OF)\s+(INSERT|UPDATE(?:\s+OF\s+\S+)?|DELETE)\b/i);
+      return {
+        name: String(r.name),
+        definition: def,
+        timing: m ? m[1].toUpperCase().replace(/\s+/g, ' ') : '',
+        event: m ? m[2].toUpperCase().replace(/\s+/g, ' ') : '',
+        table: String(r.tbl ?? ''),
+      };
+    });
+
+    return { tables, views, routines, triggers };
   }
 
   async close(): Promise<void> {

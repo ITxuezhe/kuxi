@@ -6,6 +6,9 @@ import type {
   DatabaseSchema,
   ColumnInfo,
   TableInfo,
+  ViewInfo,
+  RoutineInfo,
+  TriggerInfo,
 } from '@kuxi/shared';
 import type { IDriver } from './base';
 import { openSshTunnel, type SshTunnel } from '../ssh-tunnel';
@@ -216,7 +219,44 @@ export class MysqlDriver implements IDriver {
       }));
       tables.push({ name, columns });
     }
-    return { tables };
+
+    // 视图 / 存储过程与函数 / 触发器：information_schema 各一次全量查询
+    const views: ViewInfo[] = (
+      await this.query(
+        `SELECT table_name AS name, view_definition
+         FROM information_schema.views WHERE table_schema = ? ORDER BY table_name`,
+        [this.config.database],
+      )
+    ).rows.map((r) => ({ name: String(r.name), definition: String(r.view_definition ?? '') }));
+
+    const routines: RoutineInfo[] = (
+      await this.query(
+        `SELECT routine_name AS name, routine_type, dtd_identifier AS return_type, routine_definition
+         FROM information_schema.routines WHERE routine_schema = ? ORDER BY routine_name`,
+        [this.config.database],
+      )
+    ).rows.map((r) => ({
+      name: String(r.name),
+      kind: String(r.routine_type).toUpperCase() === 'PROCEDURE' ? 'procedure' : 'function',
+      returnType: r.return_type === null || r.return_type === undefined ? undefined : String(r.return_type),
+      definition: r.routine_definition === null ? undefined : String(r.routine_definition),
+    }));
+
+    const triggers: TriggerInfo[] = (
+      await this.query(
+        `SELECT trigger_name AS name, action_timing, event_manipulation AS event, event_object_table AS tbl, action_statement
+         FROM information_schema.triggers WHERE trigger_schema = ? ORDER BY trigger_name`,
+        [this.config.database],
+      )
+    ).rows.map((r) => ({
+      name: String(r.name),
+      timing: String(r.action_timing ?? '').toUpperCase(),
+      event: String(r.event ?? '').toUpperCase(),
+      table: String(r.tbl ?? ''),
+      definition: String(r.action_statement ?? ''),
+    }));
+
+    return { tables, views, routines, triggers };
   }
 
   async close(): Promise<void> {

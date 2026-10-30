@@ -176,7 +176,7 @@ watch(
       <span v-else class="qb-hint">{{ columns.length }} 个字段</span>
     </div>
 
-    <section class="qb-section">
+    <section class="qb-section qb-span2">
       <header class="qb-section-head">
         <strong>展示字段</strong>
         <div class="qb-mini-actions">
@@ -199,7 +199,7 @@ watch(
       <p v-if="!spec.columns.length" class="qb-hint">未勾字段将查询全部字段（SELECT *）</p>
     </section>
 
-    <section class="qb-section">
+    <section class="qb-section qb-col">
       <header class="qb-section-head">
         <strong>筛选条件</strong>
         <button class="link" type="button" @click="addFilter">＋ 添加</button>
@@ -234,7 +234,7 @@ watch(
       <p v-if="!spec.filters.length" class="qb-hint">没有条件：查询整表（默认只看前 100 行）</p>
     </section>
 
-    <section class="qb-section">
+    <section class="qb-section qb-col">
       <header class="qb-section-head">
         <strong>排序</strong>
         <button class="link" type="button" :disabled="!spec.columns.length" @click="addSort">＋ 添加</button>
@@ -260,7 +260,7 @@ watch(
       <p v-if="!spec.sorts.length" class="qb-hint">未排序。排序字段来自「展示字段」。</p>
     </section>
 
-    <section class="qb-section">
+    <section class="qb-section qb-col">
       <header class="qb-section-head">
         <strong>分组汇总</strong>
       </header>
@@ -296,13 +296,13 @@ watch(
       </p>
     </section>
 
-    <section class="qb-section qb-limit-row">
+    <section class="qb-section qb-limit-row qb-col">
       <strong>行数上限</strong>
       <input v-model.number="spec.limit" class="qb-input" type="number" min="0" step="10" />
       <span class="qb-hint">0 = 不限（大表不建议）</span>
     </section>
 
-    <section class="qb-section qb-preview">
+    <section class="qb-section qb-preview qb-span2">
       <header class="qb-section-head"><strong>生成的 SQL</strong></header>
       <pre>{{ generated || '-- 选择表后自动生成' }}</pre>
     </section>

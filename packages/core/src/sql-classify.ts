@@ -37,7 +37,8 @@ function maskLiterals(sql: string): string {
     .replace(/'(?:[^']|'')*'/g, "''")
     .replace(/"(?:[^"]|"")*"/g, '""')
     .replace(/`[^`]*`/g, '``')
-    .replace(/\$\$[\s\S]*?\$\$/g, '$$$$');
+    // PG dollar-quote（含带标签的 $fn$...$fn$）：函数体整体吞掉，体内分号不参与切分
+    .replace(/(\$[A-Za-z_0-9]*\$)[\s\S]*?\1/g, '$$$$');
 }
 
 /** 取首个关键字（大写），用于 UI 展示 */
@@ -46,12 +47,83 @@ function headToken(sql: string): string {
   return match ? match[0].toUpperCase() : '';
 }
 
-/** 按未加引号的分号切分语句 */
-function splitStatements(sql: string): string[] {
-  return maskLiterals(stripComments(sql))
+/** 普通切分：按未加引号的分号切 */
+function naiveSplit(masked: string): string[] {
+  return masked
     .split(';')
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+}
+
+/** 首条语句是触发器 / 存储过程 / 函数（体内合法包含分号的唯一场景）。
+ *  修饰符（definer/algorithm/or replace/temp）任意顺序组合，MySQL dump 常见 definer 前缀 */
+const CREATE_ROUTINE =
+  /^create\s+(?:or\s+replace\s+|definer\s*=\s*\S+\s+|algorithm\s*=\s*\w+\s+|temp(?:orary)?\s+)*?(trigger|procedure|function)\b/i;
+
+/**
+ * 块感知切分：用块栈配对 BEGIN/CASE/LOOP 与 END，只有栈空处的分号才是语句边界。
+ * IF 仅在后随 THEN（同一语句内、不跨分号）时入栈，避免 `IF EXISTS` / IF() 函数干扰。
+ *
+ * 返回 null 表示配对失衡（方言形态没覆盖，如 MySQL 的 WHILE...DO），
+ * 调用方必须回退普通切分——宁可把过程误判为多条语句，也不能漏判真正的多语句注入。
+ */
+function blockAwareSplit(masked: string): string[] | null {
+  // 注意不能把 END 后缀并进同一个正则的可选组：`BEGIN IF ...` 里的 IF 会被
+  // begin 的匹配整体吞掉，导致 END IF 到来时栈里没有 if 而误判失衡。
+  const tokens = /\b(begin|case|loop|repeat|if|end)\b|;/gi;
+  const stack: string[] = [];
+  const boundaries: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = tokens.exec(masked))) {
+    if (m[0] === ';') {
+      if (stack.length === 0) boundaries.push(m.index);
+      continue;
+    }
+    const word = m[1].toLowerCase();
+    if (word === 'end') {
+      // END 的形态单独探测：END IF / END LOOP / END WHILE / END REPEAT / END CASE / 裸 END
+      const suffix = /^\s+(if|loop|while|repeat|case)\b/i.exec(masked.slice(m.index + 3));
+      const endOf = suffix?.[1].toLowerCase();
+      if (endOf === 'if') {
+        if (stack[stack.length - 1] !== 'if') return null;
+        stack.pop();
+      } else if (endOf) {
+        if (!stack.includes(endOf)) return null;
+        stack.splice(stack.lastIndexOf(endOf), 1);
+      } else {
+        if (stack.length === 0) return null;
+        stack.pop();
+      }
+      continue;
+    }
+    if (word === 'if') {
+      // IF 仅在后面（不跨分号）跟 THEN 时才是块（IF a THEN ... END IF）；
+      // IF EXISTS / IF NOT EXISTS / IF() 函数都不是
+      const stmtEnd = masked.indexOf(';', m.index);
+      const rest = masked.slice(m.index + m[0].length, stmtEnd === -1 ? undefined : stmtEnd);
+      if (!/\bthen\b/i.test(rest)) continue;
+      stack.push('if');
+      continue;
+    }
+    stack.push(word);
+  }
+  if (stack.length > 0) return null;
+  boundaries.push(masked.length);
+  const parts: string[] = [];
+  let start = 0;
+  for (const b of boundaries) {
+    const part = masked.slice(start, b).trim();
+    if (part) parts.push(part);
+    start = b + 1;
+  }
+  return parts;
+}
+
+/** 按未加引号的分号切分语句（CREATE TRIGGER/PROCEDURE/FUNCTION 启用块感知） */
+function splitStatements(sql: string): string[] {
+  const masked = maskLiterals(stripComments(sql));
+  if (!CREATE_ROUTINE.test(masked)) return naiveSplit(masked);
+  return blockAwareSplit(masked) ?? naiveSplit(masked);
 }
 
 /** 判断是否为只读语句（供外部快速使用） */

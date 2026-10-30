@@ -930,6 +930,7 @@ onMounted(async () => {
           @build="openBuilder"
           @import="openImport"
           @drop="onDropTable"
+          @info="(title: string, content: string) => { infoTitle = title; infoContent = content; infoOpen = true }"
         />
       </aside>
 
