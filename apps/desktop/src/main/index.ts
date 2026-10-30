@@ -40,6 +40,7 @@ import {
 import { aiChat, aiTest, chatEndpoint, getAiConfigPublic, saveAiConfig } from './ai';
 import { initUpdater, registerUpdateIpc } from './updater';
 import { clearHistory, deleteHistory, listHistory, recordHistory, toggleFavorite } from './history';
+import { registerImportIpc } from './import';
 
 const manager = new ConnectionManager();
 
@@ -607,12 +608,21 @@ function registerIpc(): void {
         name: DEMO_CONNECTION_NAME,
         type: 'sqlite',
         filename: demoPath,
-        hasPassword: false,
       });
       writeStore(list);
       return { id, created: true };
     },
   );
+
+  // ---- 数据导入（CSV / Excel）----
+  registerImportIpc({
+    manager,
+    dbTypeOf: (connectionId) => {
+      const stored = readStore().find((s) => s.id === connectionId);
+      return stored?.type ?? 'sqlite';
+    },
+    isReadOnly: () => getSettings().readOnly,
+  });
 }
 
 app.whenReady().then(() => {
@@ -638,7 +648,9 @@ app.whenReady().then(() => {
 
 /** 端到端自检：验证打包后的 core 在 Electron 运行时可用（含写操作与确认护栏） */
 async function runSmoke(): Promise<void> {
-  const log = (m: string): void => process.stdout.write(m + '\n');
+  const log = (m: string): void => {
+    process.stdout.write(m + '\n');
+  };
   try {
     const t = await manager.test({ name: 'smoke', type: 'sqlite', filename: ':memory:' });
     log('SMOKE_TEST=' + JSON.stringify(t));

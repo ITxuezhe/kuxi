@@ -15,6 +15,11 @@ import type {
   ExportWithRequest,
   HistoryEntry,
   IConnectionConfig,
+  ImportOutcome,
+  ImportPickOutcome,
+  ImportProgress,
+  ImportReparseRequest,
+  ImportRunRequest,
   UpdateStatus,
 } from '@kuxi/shared';
 
@@ -82,6 +87,21 @@ const api = {
   historyDelete: (id: string): Promise<HistoryEntry[]> =>
     ipcRenderer.invoke(IPC.HistoryDelete, id),
   historyClear: (): Promise<HistoryEntry[]> => ipcRenderer.invoke(IPC.HistoryClear),
+
+  // ---- 数据导入（CSV / Excel）----
+  importPickFile: (): Promise<ImportPickOutcome> => ipcRenderer.invoke(IPC.ImportPick),
+  importReparse: (req: ImportReparseRequest): Promise<ImportPickOutcome> =>
+    ipcRenderer.invoke(IPC.ImportReparse, req),
+  importRun: (req: ImportRunRequest): Promise<ImportOutcome> =>
+    ipcRenderer.invoke(IPC.ImportRun, req),
+  /** 订阅导入进度；返回取消订阅函数 */
+  onImportProgress: (cb: (p: ImportProgress) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, p: ImportProgress): void => cb(p);
+    ipcRenderer.on(IPC.ImportProgress, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.ImportProgress, handler);
+    };
+  },
 
   // ---- 自动更新 ----
   checkUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.UpdateCheck),

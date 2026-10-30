@@ -16,6 +16,11 @@ import type {
   ExportWithRequest,
   HistoryEntry,
   IConnectionConfig,
+  ImportOutcome,
+  ImportPickOutcome,
+  ImportProgress,
+  ImportReparseRequest,
+  ImportRunRequest,
   QueryResult,
   UpdateStatus,
 } from '@kuxi/shared';
@@ -99,6 +104,13 @@ declare global {
       historyToggleFavorite(id: string): Promise<HistoryEntry[]>;
       historyDelete(id: string): Promise<HistoryEntry[]>;
       historyClear(): Promise<HistoryEntry[]>;
+
+      // ---- 数据导入（CSV / Excel）----
+      importPickFile(): Promise<ImportPickOutcome>;
+      importReparse(req: ImportReparseRequest): Promise<ImportPickOutcome>;
+      importRun(req: ImportRunRequest): Promise<ImportOutcome>;
+      /** 订阅主进程推送的导入进度；返回取消订阅函数 */
+      onImportProgress(cb: (progress: ImportProgress) => void): () => void;
 
       // ---- 自动更新 ----
       checkUpdates(): Promise<UpdateStatus>;

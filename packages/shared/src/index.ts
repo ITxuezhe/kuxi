@@ -292,6 +292,14 @@ export const IPC = {
   UpdateStatus: 'update:status',
   /** 获取应用版本号（用于「关于」/检查更新入口） */
   AppVersion: 'app:version',
+  /** 选择并解析 CSV / Excel 文件（整份数据缓存在主进程） */
+  ImportPick: 'import:pick',
+  /** 切换工作表 / 表头 / 分隔符后重新解析 */
+  ImportReparse: 'import:reparse',
+  /** 执行导入（建表 / 清空 / 批量插入） */
+  ImportRun: 'import:run',
+  /** 主进程 → 渲染进程：导入进度 */
+  ImportProgress: 'import:progress',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -555,4 +563,113 @@ export interface ConnectionImportOutcome {
 
 /** 连接列表排序方式 */
 export type ConnectionSort = 'default' | 'name' | 'type';
+
+// ============================================================================
+// 数据导入（CSV / Excel）
+// 文件解析与批量写入都在主进程完成：渲染进程只拿预览行，避免把整份数据
+// 通过 IPC 往返搬运（大文件会卡 UI，也增加结构化克隆开销）。
+// ============================================================================
+
+/** 导入文件类型 */
+export type ImportFileKind = 'csv' | 'xlsx';
+
+/** Excel 工作表摘要（供第二步选择） */
+export interface ImportSheetInfo {
+  name: string;
+  /** 工作表总行数（含表头） */
+  rows: number;
+}
+
+/** 解析选项（切换表头 / 分隔符 / 工作表时重新解析） */
+export interface ImportParseOptions {
+  /** Excel：工作表名；不传表示第一个非空表 */
+  sheet?: string;
+  /** CSV：分隔符；auto 自动识别 */
+  delimiter?: 'auto' | ',' | ';' | '\t' | '|';
+  /** 首行是否为表头（默认 true） */
+  hasHeader?: boolean;
+}
+
+/** 字段值类型推断（渲染进程据此选建表类型） */
+export type ImportValueKind = 'integer' | 'number' | 'boolean' | 'date' | 'datetime' | 'text';
+
+/** 源列元信息 */
+export interface ImportColumnMeta {
+  /** 去重后的列名（空表头会补成「列N」） */
+  name: string;
+  /** 基于整份数据推断的类型 */
+  kind: ImportValueKind;
+}
+
+/** 解析后的预览（完整数据缓存在主进程，用 importId 引用） */
+export interface ImportDatasetPreview {
+  importId: string;
+  fileName: string;
+  kind: ImportFileKind;
+  /** 当前工作表（CSV 无此字段） */
+  sheet?: string;
+  sheets: ImportSheetInfo[];
+  options: ImportParseOptions;
+  /** 文本解码方式（utf8 / utf16le / gb18030），仅 CSV 有值 */
+  encoding?: string;
+  columns: ImportColumnMeta[];
+  /** 前 N 行原始值（与 columns 顺序一致，仅用于预览） */
+  rows: Array<Array<string | number | boolean | null>>;
+  totalRows: number;
+  /** 解析时的非致命问题（列数不一致、疑似无表头等） */
+  warnings: string[];
+}
+
+/** 选择并解析文件的返回信封 */
+export type ImportPickOutcome =
+  | { ok: true; dataset: ImportDatasetPreview }
+  | { ok: false; canceled?: true; message?: string };
+
+/** 重新解析（切工作表 / 表头 / 分隔符） */
+export interface ImportReparseRequest {
+  importId: string;
+  options: ImportParseOptions;
+}
+
+/** 字段映射：源列 → 目标列 */
+export interface ImportColumnMapping {
+  sourceIndex: number;
+  target: string;
+  kind: ImportValueKind;
+}
+
+/** 执行导入（创建表 → 清空（可选）→ 批量插入） */
+export interface ImportRunRequest {
+  importId: string;
+  connectionId: string;
+  /** append：追加到已有表；overwrite：清空后写入；create：新建表 */
+  mode: 'append' | 'overwrite' | 'create';
+  table: string;
+  /** create 模式的建表 SQL（渲染进程按方言生成，主进程原样执行） */
+  createSql?: string;
+  /** 目标列顺序即 INSERT 列顺序；至少一项 */
+  mappings: ImportColumnMapping[];
+  /** 空单元格是否按 NULL 写入（默认 true） */
+  emptyAsNull?: boolean;
+}
+
+/** 导入进度（主进程 → 渲染进程推送） */
+export interface ImportProgress {
+  importId: string;
+  phase: 'prepare' | 'insert' | 'commit' | 'done';
+  done: number;
+  total: number;
+}
+
+/** 导入结果信封 */
+export type ImportOutcome =
+  | { ok: true; inserted: number; table: string; tookMs: number }
+  | {
+      ok: false;
+      inserted: number;
+      table: string;
+      message: string;
+      /** 失败时是否已回滚（批次插入在事务中执行） */
+      rolledBack: boolean;
+    };
 

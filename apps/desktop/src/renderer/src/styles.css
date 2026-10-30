@@ -2613,6 +2613,418 @@ button.danger:hover:not(:disabled) {
   }
 }
 
+/* ---------- CSV / Excel 导入向导 ---------- */
+.import-modal {
+  width: min(900px, 96vw);
+  max-width: min(900px, 96vw);
+  overflow: hidden;
+}
+.import-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.import-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.import-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.import-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 4px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+.import-steps li.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--text);
+}
+.import-steps li.done {
+  color: var(--ok);
+}
+.import-step-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--panel-3);
+  color: var(--muted);
+  font-size: calc(var(--font-sm) * 0.88);
+  font-weight: 600;
+}
+.import-steps li.active .import-step-no {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.import-steps li.done .import-step-no {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.import-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.import-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: var(--pad-card) var(--gap);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  flex-wrap: wrap;
+}
+.import-pick-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.import-pick-body {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.import-pick-body strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  line-height: 1.55;
+}
+.import-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--font-sm);
+  line-height: 1.55;
+}
+.import-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gap-sm) var(--gap);
+}
+.import-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-xs);
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+.import-option select {
+  min-width: 150px;
+}
+.import-option-block {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+.import-option-block select,
+.import-option-block input {
+  width: 100%;
+}
+.import-check input {
+  accent-color: var(--primary);
+}
+.import-meta {
+  color: var(--muted);
+  font-size: calc(var(--font-sm) * 0.92);
+}
+.import-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: var(--pad-card) var(--gap);
+  list-style: none;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  font-size: var(--font-sm);
+  line-height: 1.55;
+}
+.import-warnings li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--text);
+}
+.import-warnings .base-icon {
+  color: var(--warn);
+  margin-top: 2px;
+}
+.import-mode {
+  align-self: flex-start;
+}
+.import-overwrite {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-sm);
+  padding: var(--pad-card) var(--gap);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+.import-overwrite input {
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+.import-overwrite strong {
+  display: block;
+  font-weight: 600;
+}
+.import-overwrite em {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-style: normal;
+  font-size: calc(var(--font-sm) * 0.95);
+  line-height: 1.5;
+}
+.import-overwrite.is-danger {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+.import-overwrite.is-danger input {
+  accent-color: var(--danger);
+}
+.import-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+  font-size: var(--font-sm);
+}
+.import-map-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--panel);
+}
+.import-map-row {
+  display: grid;
+  /* 弹性列必须 minmax(0, …)：直接写 1fr 时，长字段名 / 长示例的最小内容宽度
+     会把列撑开，导致后面的列被挤到容器外（表现为列错位、右侧被裁） */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 112px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--gap-sm);
+  padding: 5px var(--pad-card);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  font-size: var(--font-sm);
+  min-height: 34px;
+}
+.import-map-table.is-create .import-map-row {
+  /* 第一列 36px：表头「导入」两个字能放下一行，勾选框在其中居中 */
+  grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1.2fr) 124px minmax(0, 1fr);
+}
+.import-map-row.is-head {
+  border-top: none;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-weight: 600;
+  min-height: 0;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+/* 斑马纹：字段多时便于横向看到同一行的源字段与目标字段 */
+.import-map-row:not(.is-head):nth-child(even) {
+  background: var(--panel-2);
+}
+.import-map-row input[type='checkbox'] {
+  accent-color: var(--primary);
+  justify-self: center;
+  margin: 0;
+}
+/* 表头「导入」与勾选框同列，居中对齐 */
+.import-map-table.is-create .import-map-row.is-head > span:first-child {
+  justify-self: center;
+}
+/* 映射表内控件统一紧凑尺寸，避免全局控件高度让每行高矮不一 */
+.import-map-row select,
+.import-map-row input[type='text'] {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px;
+  font-size: var(--font-sm);
+  line-height: 1.35;
+}
+.import-map-name,
+.import-kind,
+.import-sample {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-kind {
+  color: var(--muted);
+  font-size: calc(var(--font-sm) * 0.92);
+}
+.import-sample {
+  color: var(--muted);
+  font-size: calc(var(--font-sm) * 0.92);
+}
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap-sm);
+}
+.import-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--pad-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  font-size: var(--font-sm);
+  min-width: 0;
+}
+.import-summary span {
+  color: var(--muted);
+  font-size: calc(var(--font-sm) * 0.92);
+}
+.import-summary strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-preview-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.import-preview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-sm);
+}
+.import-preview th,
+.import-preview td {
+  padding: 6px var(--pad-card);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.import-preview th {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-weight: 600;
+}
+.import-preview tbody tr:last-child td {
+  border-bottom: none;
+}
+.import-preview td.is-null {
+  color: var(--muted);
+}
+.import-preview-wrap .import-hint {
+  padding: 0 var(--pad-card) var(--pad-card);
+}
+.import-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.import-progress-head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+.import-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-3);
+  overflow: hidden;
+}
+.import-progress-bar {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+.import-result {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-sm);
+  padding: var(--pad-card) var(--gap);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-sm);
+}
+.import-result.is-ok {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+}
+.import-result.is-ok .base-icon {
+  color: var(--ok);
+}
+.import-result.is-error {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+.import-result.is-error .base-icon {
+  color: var(--danger);
+}
+.import-result p {
+  margin-top: 3px;
+}
+@media (max-width: 720px) {
+  .import-modal {
+    width: 96vw;
+  }
+  .import-summary {
+    grid-template-columns: 1fr;
+  }
+  /* 窄屏去掉示例列：existing 保留「源字段 / 目标字段 / 类型」，
+     create 额外保留勾选列，避免两列网格把 4~5 个元素排成错位的样子 */
+  .import-map-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 96px;
+  }
+  .import-map-table.is-create .import-map-row {
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1.1fr) 104px;
+  }
+  .import-map-row.is-head {
+    display: none;
+  }
+  .import-sample {
+    display: none;
+  }
+}
+
 /* ---------- 主区标签工作台 ---------- */
 .workbench {
   flex: 1;

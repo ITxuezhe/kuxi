@@ -23,7 +23,8 @@
     "electron-updater": "^6.8.11",
     "mysql2": "^3.11.3",
     "pg": "^8.13.1",
-    "ssh2": "^1.17.0"
+    "ssh2": "^1.17.0",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@kuxi/core": "workspace:*",

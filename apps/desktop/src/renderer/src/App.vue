@@ -24,6 +24,7 @@ import BaseIcon from './components/BaseIcon.vue';
 import TemplatePicker from './components/TemplatePicker.vue';
 import GuideModal from './components/GuideModal.vue';
 import UpdateBanner from './components/UpdateBanner.vue';
+import ImportWizard from './components/ImportWizard.vue';
 import { useToast } from './composables/useToast';
 import { openContextMenu } from './composables/useContextMenu';
 import { refreshAiConfig } from './composables/useAi';
@@ -79,6 +80,11 @@ function toggleHistory(): void {
 const builderOpen = ref(false);
 /** 构建器预选表（空串表示不预选） */
 const builderTable = ref('');
+
+/** CSV / Excel 导入向导 */
+const importOpen = ref(false);
+/** 导入向导预选目标表（空串表示不预选） */
+const importTable = ref('');
 
 /** 操作模板与新手引导 */
 const templateOpen = ref(false);
@@ -550,6 +556,13 @@ function onBuilderRun(sql: string): void {
   wb.runActive();
 }
 
+/** 打开数据导入向导；窄屏下先收起侧栏抽屉 */
+function openImport(table = ''): void {
+  closeSidebar();
+  importTable.value = table;
+  importOpen.value = true;
+}
+
 /** 打开操作模板面板 */
 function openTemplates(): void {
   closeSidebar();
@@ -760,6 +773,16 @@ onMounted(async () => {
           <span>模板</span>
         </button>
         <button
+          class="ghost icon-lead"
+          type="button"
+          :disabled="!connected"
+          title="导入 CSV / Excel 数据到当前数据库"
+          @click="openImport('')"
+        >
+          <BaseIcon name="upload" :size="15" />
+          <span>导入</span>
+        </button>
+        <button
           class="icon-btn"
           type="button"
           title="使用指南"
@@ -904,6 +927,7 @@ onMounted(async () => {
           @create="() => { closeSidebar(); wb.openDesign() }"
           @design="(table: string) => { closeSidebar(); wb.openDesign(table) }"
           @build="openBuilder"
+          @import="openImport"
           @drop="onDropTable"
         />
       </aside>
@@ -949,6 +973,17 @@ onMounted(async () => {
 
     <!-- AI 配置 -->
     <AiSettings :open="aiSettingsOpen" @close="aiSettingsOpen = false" />
+
+    <!-- CSV / Excel 导入向导 -->
+    <ImportWizard
+      :open="importOpen"
+      :connection-id="activeId"
+      :db-type="dbType"
+      :connected="connected"
+      :initial-table="importTable"
+      @close="importOpen = false"
+      @done="wb.bumpSchema()"
+    />
 
     <!-- 可视化查询构建器 -->
     <Modal :open="builderOpen" title="查询构建器" body-class="qb-modal" @close="builderOpen = false">

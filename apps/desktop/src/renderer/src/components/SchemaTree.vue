@@ -38,6 +38,8 @@ const emit = defineEmits<{
   (e: 'drop', table: string): void;
   /** 可视化查询构建器（table 为空表示不预选，由构建器自动选第一张表） */
   (e: 'build', table: string): void;
+  /** 导入数据（table 为空表示不预选目标表） */
+  (e: 'import', table: string): void;
 }>();
 
 const { copy } = useClipboard();
@@ -122,6 +124,7 @@ function onTableContextMenu(event: MouseEvent, table: string): void {
   openContextMenu(event, [
     { label: '打开数据', action: () => openTable(table) },
     { label: '设计表', action: () => emit('design', table) },
+    { label: '导入数据到这张表', action: () => emit('import', table) },
     { label: '生成 SELECT 查询', action: () => pickTable(table) },
     { label: '可视化查询', action: () => emit('build', table) },
     { label: '复制表名', action: () => void copyTableName(table) },
@@ -161,6 +164,16 @@ watch(
         @click="load"
       >
         <BaseIcon name="refresh" :size="16" />
+      </button>
+      <button
+        class="icon-btn"
+        type="button"
+        :disabled="!connected"
+        title="导入 CSV / Excel 数据"
+        aria-label="导入数据"
+        @click="emit('import', '')"
+      >
+        <BaseIcon name="upload" :size="16" />
       </button>
       <button
         class="icon-btn"
