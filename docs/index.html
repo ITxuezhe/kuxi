@@ -315,7 +315,7 @@
   .dl-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; }
   .dl-top h3 { font-size: 26px; }
   .dl-top .ver { font-family: var(--mono); font-size: 12px; color: var(--muted-2); }
-  .plats { margin-top: 30px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .plats { margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .plat {
     display: flex; align-items: center; gap: 16px; padding: 18px 20px;
     border-radius: 12px; border: 1px solid var(--line); background: rgba(18, 21, 28, .8);
@@ -386,6 +386,7 @@
     .win-body { grid-template-columns: 120px minmax(0, 1fr) 210px; height: 380px; }
     .entries { grid-template-columns: 1fr; }
     .secure-grid { grid-template-columns: 1fr; }
+    .plats { grid-template-columns: 1fr; }
   }
   @media (max-width: 820px) {
     .top nav { display: none; }
@@ -432,7 +433,7 @@
       <a href="#compare">凭什么选它</a>
       <a href="#secure">安全</a>
       <a href="#download">下载</a>
-      <a class="btn btn-sm btn-primary" href="https://github.com/ITxuezhe/kuxi/releases/latest" target="_blank" rel="noopener">下载 macOS 版</a>
+      <a class="btn btn-sm btn-primary" href="https://github.com/ITxuezhe/kuxi/releases/latest" target="_blank" rel="noopener">下载安装包</a>
     </nav>
   </div>
 </header>
@@ -451,13 +452,13 @@
         <div class="hero-act">
           <a class="btn btn-primary" href="https://github.com/ITxuezhe/kuxi/releases/latest" target="_blank" rel="noopener">
             下载 v<span id="hero-ver">0.1.0</span>
-            <span aria-hidden="true" style="font-family:var(--mono);font-size:12px;opacity:.7">macOS</span>
+            <span aria-hidden="true" style="font-family:var(--mono);font-size:12px;opacity:.7">桌面版</span>
           </a>
           <a class="btn" href="#entries">先看看能做什么</a>
         </div>
         <div class="meta-line">
           <span>SQLite / MySQL / PostgreSQL</span>
-          <span>Apple Silicon · Intel</span>
+          <span>macOS / Windows</span>
           <span>约 100 MB</span>
           <span>AGPL-3.0</span>
         </div>
@@ -669,7 +670,7 @@
       <div class="sec-head reveal">
         <div class="kicker">Download</div>
         <h2>下载安装包</h2>
-        <p class="sub">目前提供 macOS 版本（Apple Silicon 与 Intel 分开打包）。Windows / Linux 在路上。</p>
+        <p class="sub">macOS（Apple Silicon / Intel）与 Windows x64 均提供安装包，应用内自带自动更新。Linux 在路上。</p>
       </div>
 
       <div class="dl-panel reveal">
@@ -685,7 +686,7 @@
           <a class="plat" data-arch="arm64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.1.0/Kuxi-0.1.0-arm64.dmg">
             <span class="glyph" aria-hidden="true">✦</span>
             <span class="t">
-              <b>macOS · Apple Silicon<span class="badge" data-badge>推荐</span></b>
+              <b>macOS · Apple Silicon</b>
               <span id="meta-arm64">M1 / M2 / M3 / M4 · dmg · 117 MB</span>
             </span>
             <span class="get">下载</span>
@@ -698,10 +699,18 @@
             </span>
             <span class="get">下载</span>
           </a>
+          <a class="plat" data-os="win" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.1.0/Kuxi-0.1.0-x64.exe">
+            <span class="glyph" aria-hidden="true">▣</span>
+            <span class="t">
+              <b>Windows · x64</b>
+              <span id="meta-win">Windows 10 / 11 · exe · 89 MB</span>
+            </span>
+            <span class="get">下载</span>
+          </a>
         </div>
 
         <div class="dl-note">
-          <span>要求 macOS 11 及以上</span>
+          <span>macOS 11+ / Windows 10、11</span>
           <span>应用内自带自动更新</span>
           <span>未签名版本，首次打开见下方说明</span>
         </div>
@@ -711,7 +720,8 @@
           <button type="button" id="copy-btn">复制</button>
         </div>
         <p style="margin-top:12px;font-size:13px;color:var(--muted-2)">
-          当前安装包未做 Apple 开发者签名与公证。若双击提示「无法验证开发者」或「已损坏」，请用上方命令，或在 Finder 里右键「库犀」→「打开」。
+          当前安装包未做代码签名。<b>macOS</b>：若提示「无法验证开发者」或「已损坏」，用上方命令，或在 Finder 里右键「库犀」→「打开」。
+          <b>Windows</b>：若 SmartScreen 拦截，点「更多信息」→「仍要运行」即可。
         </p>
       </div>
     </div>
@@ -779,27 +789,32 @@
     io.observe(el);
   });
 
-  // 2) 按平台高亮对应安装包：Apple Silicon 上标 M 系列，Intel 上标 Intel
+  // 2) 按平台高亮对应安装包：Windows 标 exe，Mac 按芯片标 Apple Silicon / Intel
   (function () {
     const ua = navigator.userAgent || '';
+    const isWin = /Windows/.test(ua);
     const isMac = /Macintosh|Mac OS X/.test(ua);
-    if (!isMac) return;
-    // 浏览器里无法直接判断芯片架构，用 WebGL 渲染器名称做启发式判断
-    let arch = 'arm64';
-    try {
-      const gl = document.createElement('canvas').getContext('webgl');
-      const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
-      const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '';
-      if (/Intel|AMD|Radeon/i.test(r)) arch = 'x64';
-    } catch (_) { /* 忽略：取默认值 */ }
-    const plat = document.querySelector('.plat[data-arch="' + arch + '"]');
-    if (plat) {
-      plat.classList.add('rec');
-      const old = document.querySelector('[data-badge]');
-      if (old) old.removeAttribute('data-badge');
-      const badge = plat.querySelector('.badge');
-      if (badge) badge.textContent = '为你推荐';
+    let target = null;
+
+    if (isWin) {
+      target = document.querySelector('.plat[data-os="win"]');
+    } else if (isMac) {
+      // 浏览器里无法直接判断芯片架构，用 WebGL 渲染器名称做启发式判断
+      let arch = 'arm64';
+      try {
+        const gl = document.createElement('canvas').getContext('webgl');
+        const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+        const r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '';
+        if (/Intel|AMD|Radeon/i.test(r)) arch = 'x64';
+      } catch (_) { /* 忽略：取默认值 */ }
+      target = document.querySelector('.plat[data-arch="' + arch + '"]');
     }
+    if (!target) return;
+    target.classList.add('rec');
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = '为你推荐';
+    target.querySelector('b')?.appendChild(badge);
   })();
 
   // 3) 复制 Gatekeeper 解除命令
@@ -854,6 +869,16 @@
           sizeEl.textContent = label + ' · dmg · ' + Math.round(asset.size / 1048576) + ' MB';
         }
       });
+
+      const exe = assets.find((a) => /-x64\.exe$/i.test(a.name));
+      if (exe) {
+        const winLink = document.querySelector('.plat[data-os="win"]');
+        if (winLink) winLink.setAttribute('href', exe.browser_download_url);
+        const winSize = document.getElementById('meta-win');
+        if (winSize) {
+          winSize.textContent = 'Windows 10 / 11 · exe · ' + Math.round(exe.size / 1048576) + ' MB';
+        }
+      }
     };
 
     try {
