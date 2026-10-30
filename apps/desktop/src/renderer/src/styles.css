@@ -316,7 +316,8 @@ textarea:disabled {
 }
 
 .sidebar {
-  width: var(--sidebar-width);
+  /* 随窗口宽度收缩：窄窗口下优先保证主工作区宽度，不把数据栏挤成多行 */
+  width: clamp(220px, 25vw, var(--sidebar-width));
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   /* 次级表面：开背景图时比主工作区更透（--surface-side），让中间区成为视觉主体 */
@@ -1728,7 +1729,8 @@ button.danger:hover:not(:disabled) {
 
 /* ---------- AI 助手抽屉 ---------- */
 .ai-panel {
-  width: 372px;
+  /* 随窗口宽度自适应：窄窗口下让出主工作区，避免把数据栏挤到换行 */
+  width: clamp(260px, 30vw, 372px);
   flex-shrink: 0;
   border-left: 1px solid var(--border);
   background: var(--panel);
@@ -2339,6 +2341,7 @@ button.danger:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
   max-width: 200px;
   padding: 5px 8px 5px 10px;
   border: 1px solid transparent;
@@ -2473,21 +2476,40 @@ button.danger:hover:not(:disabled) {
 .data-tab-bar {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
+  row-gap: 6px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+}
+
+/* 窄窗口下按钮整体换行到下一行，绝不把文字挤成竖排 */
+.data-tab-bar > button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .data-tab-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 240px;
   color: var(--text);
   font-size: var(--font-sm);
   font-weight: 600;
+}
+
+/* 长表名省略，不撑破工具栏 */
+.data-tab-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 网格撑满主区，分页栏固定底部 */

@@ -69,7 +69,7 @@ function queryWithSql(): void {
     <div class="data-tab-bar">
       <span class="data-tab-title">
         <BaseIcon name="database" :size="14" />
-        数据：{{ tab.table }}
+        <span class="data-tab-title-text">数据：{{ tab.table }}</span>
       </span>
       <button
         class="ghost icon-lead"
