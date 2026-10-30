@@ -112,31 +112,35 @@ async function run(
   confirmed = false,
   silent = false,
 ): Promise<void> {
+  // 归一化为响应式代理：openData/openQuery 等调用方持有的是 makeTab 返回的裸对象，
+  // 直接写裸对象的 running/result 不会触发 Vue 依赖更新，UI 会卡在「执行中」且「停止」失灵。
+  // tabs 数组里读回的才是代理，所有状态写入必须走它。
+  const live = tabs.value.find((t) => t.id === tab.id) ?? tab;
   if (!connIdRef?.value) {
-    tab.error = '请先选择或新建一个连接';
+    live.error = '请先选择或新建一个连接';
     if (!silent) toast.error('请先选择或新建一个连接');
     return;
   }
-  tab.running = true;
-  tab.error = '';
-  tab.result = null;
+  live.running = true;
+  live.error = '';
+  live.result = null;
   try {
     // 只有查询标签的手写 SQL 进历史；数据网格的生成语句不记录，避免把历史刷成噪音
     const outcome = await window.kuxi.execute(
       connIdRef.value,
       sql,
       confirmed,
-      tab.kind === 'query',
+      live.kind === 'query',
     );
     if (outcome.status === 'ok') {
       const r = outcome.result;
-      tab.result = r;
+      live.result = r;
       if (r && typeof r.affectedRows === 'number' && r.affectedRows >= 0 && r.kind !== 'read') {
         if (!silent) {
           toast.success(`执行成功：影响 ${r.affectedRows} 行，耗时 ${r.tookMs}ms`);
         }
         // 数据标签的写操作成功后自动重跑网格 SQL 刷新（覆盖确认弹窗后不刷新的路径）
-        if (tab.kind === 'data') void run(tab, tab.gridSql, false, true);
+        if (live.kind === 'data') void run(live, live.gridSql, false, true);
       } else if (r && !silent) {
         toast.success(`查询完成：${r.rowCount} 行，耗时 ${r.tookMs}ms`);
       }
@@ -144,17 +148,17 @@ async function run(
       // 用户主动取消：不是错误，不写入历史，结果区保持空态
       if (!silent) toast.info('查询已取消');
     } else if (outcome.status === 'confirm') {
-      confirmHandler?.(tab, outcome.sql, outcome.analysis ?? null);
+      confirmHandler?.(live, outcome.sql, outcome.analysis ?? null);
     } else {
-      tab.error = outcome.message;
+      live.error = outcome.message;
       if (!silent) toast.error(outcome.message);
     }
   } catch (e) {
     const message = (e as Error).message;
-    tab.error = message;
+    live.error = message;
     if (!silent) toast.error(`执行失败：${message}`);
   } finally {
-    tab.running = false;
+    live.running = false;
   }
 }
 
@@ -289,7 +293,8 @@ export function useWorkbench() {
     });
     tabs.value.push(tab);
     activeId.value = tab.id;
-    return tab;
+    // 返回响应式代理（而非 makeTab 的裸对象），调用方后续写入（sql/running 等）才能驱动 UI
+    return tabs.value.find((t) => t.id === tab.id) ?? tab;
   }
 
   /** 连接就绪后保底开一个查询标签，避免主区空白 */
@@ -315,7 +320,7 @@ export function useWorkbench() {
     tabs.value.push(tab);
     activeId.value = tab.id;
     void run(tab, gridSql);
-    return tab;
+    return tabs.value.find((t) => t.id === tab.id) ?? tab;
   }
 
   function openDesign(table?: string): WorkbenchTab {
@@ -334,7 +339,7 @@ export function useWorkbench() {
     });
     tabs.value.push(tab);
     activeId.value = tab.id;
-    return tab;
+    return tabs.value.find((t) => t.id === tab.id) ?? tab;
   }
 
   /** 把 SQL 填入当前查询标签；当前不是查询标签则新建一个 */

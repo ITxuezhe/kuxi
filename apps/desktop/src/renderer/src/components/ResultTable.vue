@@ -14,7 +14,7 @@
  * - 可编辑网格（双击表打开）底部常驻一条空白「新增行」，填写后 Enter/按钮写入
  * - 双击单元格改单格，右键复制/导出
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import type { DbType, ExporterInfo, QueryResult } from '@kuxi/shared';
 import { useClipboard } from '../composables/useClipboard';
 import { useToast } from '../composables/useToast';
@@ -791,11 +791,14 @@ async function exportWith(exporter: ExporterInfo): Promise<void> {
     return;
   }
   try {
+    // IPC 走结构化克隆，Vue 响应式 Proxy 无法克隆（报 "An object could not be cloned"），
+    // 必须先 toRaw 取回原始对象再传参（原始对象的嵌套值同样是非代理的裸数据）
+    const raw = toRaw(props.result);
     const outcome = await window.kuxi.exportWith({
       exporterId: exporter.id,
       suggestedBaseName: defaultBaseName(),
-      columns: props.result.columns,
-      rows: props.result.rows,
+      columns: raw.columns,
+      rows: raw.rows,
     });
     if (outcome.ok) {
       toast.success(`已导出到 ${outcome.path}`);
