@@ -140,6 +140,9 @@ async function run(
       } else if (r && !silent) {
         toast.success(`查询完成：${r.rowCount} 行，耗时 ${r.tookMs}ms`);
       }
+    } else if (outcome.status === 'cancelled') {
+      // 用户主动取消：不是错误，不写入历史，结果区保持空态
+      if (!silent) toast.info('查询已取消');
     } else if (outcome.status === 'confirm') {
       confirmHandler?.(tab, outcome.sql, outcome.analysis ?? null);
     } else {
@@ -169,7 +172,7 @@ async function execAndRefresh(tab: WorkbenchTab, sql: string): Promise<void> {
       await run(tab, tab.gridSql);
     } else if (outcome.status === 'confirm') {
       confirmHandler?.(tab, outcome.sql, outcome.analysis ?? null);
-    } else {
+    } else if (outcome.status === 'error') {
       toast.error(outcome.message);
     }
   } catch (e) {
@@ -227,6 +230,54 @@ export function useWorkbench() {
     if (t.kind === 'query') void run(t, sqlOverride ?? t.sql);
     else if (t.kind === 'data') void run(t, t.gridSql);
     else toast.info('当前是「设计表」标签页，没有可执行语句');
+  }
+
+  /**
+   * 查看执行计划：把 EXPLAIN 结果直接写进当前标签的结果区。
+   * 不进执行历史、不触发确认流程（主进程只允许对查询语句 EXPLAIN）。
+   */
+  async function explainPlan(tab: WorkbenchTab, sql: string): Promise<void> {
+    if (!connIdRef?.value) {
+      toast.error('请先选择或新建一个连接');
+      return;
+    }
+    if (!sql.trim()) {
+      toast.error('没有可分析的 SQL');
+      return;
+    }
+    tab.running = true;
+    tab.error = '';
+    tab.result = null;
+    try {
+      const outcome = await window.kuxi.explain(connIdRef.value, sql);
+      if (outcome.status === 'ok') {
+        tab.result = outcome.result;
+        toast.success(`已生成执行计划，耗时 ${outcome.result.tookMs}ms`);
+      } else if (outcome.status === 'error') {
+        tab.error = outcome.message;
+        toast.error(outcome.message);
+      } else if (outcome.status === 'confirm') {
+        confirmHandler?.(tab, outcome.sql, outcome.analysis ?? null);
+      }
+    } catch (e) {
+      tab.error = (e as Error).message;
+      toast.error(`生成执行计划失败：${(e as Error).message}`);
+    } finally {
+      tab.running = false;
+    }
+  }
+
+  /** 顶栏「停止」：取消当前标签所在连接上的在途查询 */
+  async function cancelActive(): Promise<void> {
+    const t = activeTab.value;
+    if (!t?.running || !connIdRef?.value) return;
+    try {
+      const res = await window.kuxi.cancelQuery(connIdRef.value);
+      if (res.ok) toast.info('正在取消查询…');
+      else toast.info(res.message ?? '当前没有正在执行的查询');
+    } catch (e) {
+      toast.error(`取消失败：${(e as Error).message}`);
+    }
   }
 
   function openQuery(initialSql = ''): WorkbenchTab {
@@ -399,7 +450,13 @@ export function useWorkbench() {
       try {
         const outcome = await window.kuxi.execute(connIdRef.value, sql, false, false);
         if (outcome.status !== 'ok') {
-          toast.error(`第 ${done + 1} 处修改失败：${outcome.message}（其余修改仍在暂存区）`);
+          const reason =
+            outcome.status === 'error'
+              ? outcome.message
+              : outcome.status === 'cancelled'
+                ? '操作已取消'
+                : '需要确认（批量提交不支持逐条确认）';
+          toast.error(`第 ${done + 1} 处修改失败：${reason}（其余修改仍在暂存区）`);
           return;
         }
         done += 1;
@@ -484,8 +541,14 @@ export function useWorkbench() {
         confirmHandler?.(tab, outcome.sql, outcome.analysis ?? null);
         return false;
       }
-      tab.designError = outcome.message;
-      toast.error(outcome.message);
+      if (outcome.status === 'cancelled') {
+        toast.info('建表已取消');
+        return false;
+      }
+      if (outcome.status === 'error') {
+        tab.designError = outcome.message;
+        toast.error(outcome.message);
+      }
       return false;
     } catch (e) {
       tab.designError = (e as Error).message;
@@ -567,6 +630,8 @@ export function useWorkbench() {
     // 标签操作
     run,
     runActive,
+    cancelActive,
+    explainPlan,
     openQuery,
     ensureQueryTab,
     openData,

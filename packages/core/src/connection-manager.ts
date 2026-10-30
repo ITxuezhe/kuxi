@@ -159,10 +159,12 @@ export class ConnectionManager {
       throw new DbException(needConfirm(analysis, sql));
     }
 
+    const maxRows = options.maxRows ?? 200;
     try {
-      const res = await this.getDriver(id).query(sql, options.params ?? []);
+      // maxRows 同时传给驱动：支持的驱动（SQLite / PostgreSQL）会达到上限就停止拉取
+      const res = await this.getDriver(id).query(sql, options.params ?? [], { maxRows });
       res.kind = analysis.kind;
-      const maxRows = options.maxRows ?? 200;
+      // 兜底：驱动未做流式截断时仍在此裁剪
       if (res.rows.length > maxRows) {
         res.rows = res.rows.slice(0, maxRows);
         res.rowCount = res.rows.length;
@@ -171,6 +173,20 @@ export class ConnectionManager {
       return res;
     } catch (e) {
       throw new DbException(normalizeError(e, sql));
+    }
+  }
+
+  /**
+   * 取消某连接上正在执行的查询。
+   * @returns true 表示已发出中断（或已强制断开连接）；false 表示无法中断（SQLite 同步执行）
+   */
+  async cancel(id: string): Promise<boolean> {
+    const driver = this.getDriver(id);
+    if (!driver.cancel) return false;
+    try {
+      return await driver.cancel();
+    } catch {
+      return false;
     }
   }
 

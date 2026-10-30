@@ -22,6 +22,7 @@ export type IconName =
   | 'unlock'
   | 'sparkles'
   | 'play'
+  | 'stop'
   | 'plus'
   | 'refresh'
   | 'chevron-down'
@@ -68,6 +69,7 @@ const PATHS: Record<IconName, string> = {
   sparkles:
     '<path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z"/>',
   play: '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   menu: '<path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/>',
   refresh:

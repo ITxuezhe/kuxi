@@ -93,6 +93,17 @@ button.primary:hover:not(:disabled) {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
 }
+/* 执行中：主按钮切换为「停止」，用危险色区分「中断」语义 */
+.topbar-actions button.is-stop {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-primary);
+}
+.topbar-actions button.is-stop:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  filter: brightness(1.08);
+}
 button.ghost {
   background: transparent;
   border-color: transparent;
@@ -240,6 +251,9 @@ textarea:disabled {
   font-weight: 700;
   letter-spacing: 0.02em;
   margin-right: auto;
+  /* 品牌区不压缩：窗口变窄时由响应式规则收起副标题，而不是让文字折行 */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .brand-mark {
   display: inline-flex;
@@ -262,6 +276,13 @@ textarea:disabled {
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
+  /* 操作区不参与收缩：优先压缩品牌副标题与连接胶囊，避免按钮被压扁后文字折行 */
+  flex-shrink: 0;
+}
+/* 顶栏按钮一律单行；中文按钮一旦折行会变成竖排并撑出顶栏高度 */
+.topbar-actions button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 /* 图标 + 文字按钮：图标与文字基线对齐、间距统一 */
 .icon-lead {
@@ -278,8 +299,9 @@ textarea:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  /* 允许随窗口收缩，但标签文字绝不换行，超长的值用省略号 */
-  max-width: min(46vw, 460px);
+  /* 允许随窗口收缩，但标签文字绝不换行，超长的值用省略号。
+     上限 420px：给右侧操作区留足宽度，避免 1320 默认宽度下「执行」被挤出 */
+  max-width: min(40vw, 420px);
   min-width: 0;
   padding: 3px 10px;
   border: 1px solid var(--border);
@@ -3376,6 +3398,30 @@ button.danger:hover:not(:disabled) {
   inset: 0;
   z-index: 9;
   background: rgba(0, 0, 0, 0.45);
+}
+
+/* 窄窗口顶栏：窗口可缩到 960px，按重要性逐级收起文字。
+   图标按钮都带 title / aria-label，收起文字后仍可识别 */
+@media (max-width: 1040px) {
+  .brand-sub {
+    display: none;
+  }
+  .topbar-actions .icon-lead > span,
+  .theme-trigger .theme-label {
+    display: none;
+  }
+  .topbar-actions .icon-lead,
+  .topbar-actions .theme-trigger {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  /* 「当前连接：」省略，只留状态点 + 连接名 */
+  .conn-chip > span:nth-child(2) {
+    display: none;
+  }
+  .conn-chip {
+    max-width: min(32vw, 200px);
+  }
 }
 
 @media (max-width: 900px) {

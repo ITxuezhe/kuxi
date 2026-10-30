@@ -28,6 +28,9 @@ export class MysqlDriver implements IDriver {
   private conn: mysql.Connection | null = null;
   /** SSH 隧道（仅 config.ssh.enabled 时存在，随连接一起关闭） */
   private tunnel: SshTunnel | null = null;
+  /** 实际建连地址（SSH 场景为隧道本地端口），取消查询时用它在旁路建一条临时连接 */
+  private liveHost = '127.0.0.1';
+  private livePort = 3306;
   constructor(private readonly config: IConnectionConfig) {}
 
   async connect(): Promise<void> {
@@ -58,6 +61,8 @@ export class MysqlDriver implements IDriver {
         enableKeepAlive: true,
         keepAliveInitialDelay: 10_000,
       });
+      this.liveHost = host ?? '127.0.0.1';
+      this.livePort = port;
     } catch (e) {
       // 建连失败不要把隧道留在后台
       await this.close();
@@ -142,6 +147,44 @@ export class MysqlDriver implements IDriver {
     const cols = (fields ?? []).map((f) => f.name);
     const rowArr = rows as Record<string, unknown>[];
     return { columns: cols, rows: rowArr, rowCount: rowArr.length, tookMs };
+  }
+
+  /**
+   * 取消当前查询。
+   * 优先用旁路连接发 KILL QUERY（保留会话状态）；失败（无权限 / 网络）则强制断开套接字，
+   * 让在途请求立即失败，由下一次查询自动重连。
+   */
+  async cancel(): Promise<boolean> {
+    const conn = this.conn;
+    if (!conn) return false;
+    const threadId = (conn as unknown as { threadId?: number }).threadId;
+    let probe: mysql.Connection | null = null;
+    try {
+      if (threadId) {
+        probe = await mysql.createConnection({
+          host: this.liveHost,
+          port: this.livePort,
+          user: this.config.user,
+          password: this.config.password,
+          ssl: this.config.ssl ? { rejectUnauthorized: false } : undefined,
+          connectTimeout: CONNECT_TIMEOUT_MS,
+        });
+        await probe.query(`KILL QUERY ${Number(threadId)}`);
+        return true;
+      }
+    } catch {
+      /* KILL 失败时退回强制断开 */
+    } finally {
+      if (probe) {
+        try {
+          await probe.end();
+        } catch {
+          /* 临时连接可能已被服务端掐断 */
+        }
+      }
+    }
+    this.killConn();
+    return true;
   }
 
   async listTables(): Promise<string[]> {

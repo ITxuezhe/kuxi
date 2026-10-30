@@ -794,14 +794,15 @@ onMounted(async () => {
         <ThemeSwitcher />
         <button
           class="primary"
+          :class="{ 'is-stop': running }"
           type="button"
-          :disabled="running"
-          :title="activeId ? '执行当前标签页' : '请先选择连接'"
-          @click="wb.runActive()"
+          :title="
+            running ? '取消当前查询' : activeId ? '执行当前标签页' : '请先选择连接'
+          "
+          @click="running ? wb.cancelActive() : wb.runActive()"
         >
-          <span v-if="running" class="spinner" aria-hidden="true"></span>
-          <BaseIcon v-else name="play" :size="13" />
-          <span>{{ running ? '执行中…' : '执行' }}</span>
+          <BaseIcon :name="running ? 'stop' : 'play'" :size="13" />
+          <span>{{ running ? '停止' : '执行' }}</span>
         </button>
       </div>
     </header>

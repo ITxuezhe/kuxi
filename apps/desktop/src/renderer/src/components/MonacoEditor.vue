@@ -66,6 +66,8 @@ const emit = defineEmits<{
   optimize: [payload: { text: string; start: number; end: number }];
   /** 请求 AI 解释 */
   explain: [text: string];
+  /** 查看执行计划（选区或全文） */
+  'explain-plan': [text: string];
   /** 请求 AI 修复（携带最近报错） */
   fix: [payload: { text: string; start: number; end: number; error: string }];
 }>();
@@ -107,6 +109,11 @@ function onExplain(): void {
   const { text } = getSelectionRange();
   emit('explain', text);
 }
+/** 执行计划入口：取选区或全文后上抛 */
+function onExplainPlan(): void {
+  const { text } = getSelectionRange();
+  emit('explain-plan', text);
+}
 function onOptimize(): void {
   const { text, start, end } = getSelectionRange();
   emit('optimize', { text, start, end });
@@ -127,6 +134,7 @@ function showMenu(event: MouseEvent): void {
       ? [{ label: '执行选中', action: () => emit('execute-selection', text) }]
       : []),
     { label: '格式化 SQL', separator: true, action: () => emit('format', { text, start, end }) },
+    { label: '查看执行计划', action: () => emit('explain-plan', text) },
     {
       label: 'AI 优化',
       disabled: !props.aiReady,
@@ -296,6 +304,9 @@ onBeforeUnmount(() => {
       </span>
       <span v-if="props.running" style="color: var(--muted)">执行中，编辑已临时锁定…</span>
       <span class="spacer"></span>
+      <button type="button" class="link" title="EXPLAIN 查看执行计划" @click="onExplainPlan">
+        执行计划
+      </button>
       <button type="button" class="link" :disabled="!aiReady" @click="onExplain">AI 解释</button>
       <button type="button" class="link" :disabled="!aiReady" @click="onOptimize">AI 优化</button>
       <button

@@ -8,10 +8,12 @@
     "@kuxi/shared": "workspace:*",
     "mysql2": "^3.11.3",
     "pg": "^8.13.1",
+    "pg-cursor": "^2.22.1",
     "ssh2": "^1.17.0"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",
+    "@types/pg-cursor": "^2.7.2",
     "@types/ssh2": "^1.15.6",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"

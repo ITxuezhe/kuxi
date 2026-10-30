@@ -25,6 +25,7 @@ const { ready: aiReady } = useAi();
       @format="(p: { text: string; start: number; end: number }) => wb.format(tab, p)"
       @optimize="(p: { text: string; start: number; end: number }) => wb.optimize(tab, p)"
       @explain="(text: string) => wb.explain(text)"
+      @explain-plan="(text: string) => wb.explainPlan(tab, text)"
       @fix="(p: { text: string; start: number; end: number; error: string }) => wb.fix(tab, p)"
     />
     <ResultTable

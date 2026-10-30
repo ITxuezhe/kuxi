@@ -69,6 +69,10 @@ declare global {
         confirmed?: boolean,
         record?: boolean,
       ): Promise<ExecuteOutcome>;
+      /** 取消该连接上正在执行的查询 */
+      cancelQuery(id: string): Promise<{ ok: boolean; interrupted?: boolean; message?: string }>;
+      /** 查看执行计划（仅查询语句） */
+      explain(id: string, sql: string): Promise<ExecuteOutcome>;
       listConnections(): Promise<ConnectionItem[]>;
       test(config: IConnectionConfig): Promise<{ ok: boolean; message: string }>;
       testExisting(

@@ -205,6 +205,13 @@ function createWindow(): void {
 }
 
 function registerIpc(): void {
+  /**
+   * 运行中的查询登记：连接 id → 取消标记。
+   * 每条连接同一时间只跑一条查询（驱动本身是单连接），
+   * 「停止」按钮只标记，由 Execute 收尾时把它翻译成 cancelled 信封。
+   */
+  const runningQueries = new Map<string, { cancelled: boolean }>();
+
   // 建立连接并持久化配置（密码加密）
   ipcMain.handle(IPC.Connect, async (_e, config: IConnectionConfig) => {
     let connId: string;
@@ -336,6 +343,9 @@ function registerIpc(): void {
           };
         }
       }
+      // 登记运行中的查询：取消按钮据此把「用户主动取消」与真实错误区分开
+      const running = { cancelled: false };
+      runningQueries.set(id, running);
       try {
         const result = await manager.execute(id, sql, {
           allowWrite: true,
@@ -343,6 +353,7 @@ function registerIpc(): void {
           confirmed,
           maxRows: 500,
         });
+        if (running.cancelled) return { status: 'cancelled' };
         if (record && sql.trim()) {
           recordHistory({
             sql,
@@ -355,6 +366,8 @@ function registerIpc(): void {
         return { status: 'ok', result };
       } catch (e) {
         const err = normalizeError(e, sql);
+        // 取消导致的报错（KILL / 连接强制断开）不写入历史，也不走确认流程
+        if (running.cancelled) return { status: 'cancelled' };
         if (err.code === 'CONFIRM_REQUIRED' && err.analysis) {
           return { status: 'confirm', sql, analysis: err.analysis };
         }
@@ -367,6 +380,58 @@ function registerIpc(): void {
             error: err.message,
           });
         }
+        return { status: 'error', code: err.code, message: err.message };
+      } finally {
+        if (runningQueries.get(id) === running) runningQueries.delete(id);
+      }
+    },
+  );
+
+  /** 取消当前连接上正在执行的查询（顶栏「停止」按钮） */
+  ipcMain.handle(IPC.QueryCancel, async (_e, id: string) => {
+    const running = runningQueries.get(id);
+    if (!running) return { ok: false, message: '当前没有正在执行的查询' };
+    running.cancelled = true;
+    let interrupted = false;
+    try {
+      interrupted = await manager.cancel(id);
+    } catch {
+      /* 连接已断等情况：标记仍生效，UI 会在结果返回后显示已取消 */
+    }
+    return { ok: true, interrupted };
+  });
+
+  /**
+   * 查看执行计划。只允许对「查询语句」EXPLAIN（写/DDL 拒绝），
+   * 语句按方言拼接：SQLite 用 EXPLAIN QUERY PLAN（人类可读的索引/扫描说明），
+   * MySQL / PostgreSQL 用普通 EXPLAIN（表格 / 文本行）。
+   * 不写入执行历史；执行计划本身是只读操作，不需要确认流程。
+   */
+  ipcMain.handle(
+    IPC.Explain,
+    async (_e, id: string, sql: string): Promise<ExecuteOutcome> => {
+      const analysis = analyzeSql(sql);
+      if (analysis.kind !== 'read') {
+        return {
+          status: 'error',
+          code: 'UNSUPPORTED',
+          message: '只能对查询语句（SELECT / WITH / PRAGMA 等）查看执行计划',
+        };
+      }
+      const type = readStore().find((s) => s.id === id)?.type ?? 'sqlite';
+      const planSql =
+        type === 'sqlite'
+          ? `EXPLAIN QUERY PLAN ${sql.trim().replace(/;+\s*$/, '')};`
+          : `EXPLAIN ${sql.trim().replace(/;+\s*$/, '')};`;
+      try {
+        const result = await manager.execute(id, planSql, {
+          allowWrite: false,
+          allowDdl: false,
+          maxRows: 2000,
+        });
+        return { status: 'ok', result };
+      } catch (e) {
+        const err = normalizeError(e, planSql);
         return { status: 'error', code: err.code, message: err.message };
       }
     },

@@ -7,7 +7,7 @@ import type {
   ColumnInfo,
   TableInfo,
 } from '@kuxi/shared';
-import type { IDriver } from './base';
+import type { IDriver, DriverQueryOptions } from './base';
 
 /**
  * SQLite 驱动（基于 Node 22 内置 node:sqlite，零原生编译依赖）。
@@ -31,7 +31,11 @@ export class SqliteDriver implements IDriver {
     return this.db !== null;
   }
 
-  async query(sql: string, params: unknown[] = []): Promise<QueryResult> {
+  async query(
+    sql: string,
+    params: unknown[] = [],
+    options: DriverQueryOptions = {},
+  ): Promise<QueryResult> {
     if (!this.db) throw new Error('未连接');
     const start = performance.now();
     // node:sqlite 的 StatementSync 类型在部分 @types/node 版本里不完整，
@@ -39,6 +43,7 @@ export class SqliteDriver implements IDriver {
     const stmt = this.db.prepare(sql) as unknown as {
       columns?: () => Array<{ name: string }>;
       all: (...args: never[]) => Record<string, unknown>[];
+      iterate?: (...args: never[]) => IterableIterator<Record<string, unknown>>;
       run: (...args: never[]) => { changes?: number };
     };
     const args = params as never[];
@@ -58,12 +63,34 @@ export class SqliteDriver implements IDriver {
       );
 
     if (readLike) {
-      const rows = stmt.all(...args) ?? [];
+      const limit = options.maxRows;
+      let rows: Record<string, unknown>[];
+      let truncated = false;
+      const iterate = stmt.iterate;
+      if (limit && limit > 0 && typeof iterate === 'function') {
+        // 游标迭代：达到上限立即停止，不把整表读进内存（多取一行用于判断是否还有剩余）
+        // 必须把 this 绑回 stmt 调用，取成独立函数会触发 "Illegal invocation"
+        const collected: Record<string, unknown>[] = [];
+        const it = iterate.call(stmt, ...args);
+        for (const row of it) {
+          if (collected.length >= limit) {
+            truncated = true;
+            (it as { return?: () => void }).return?.();
+            break;
+          }
+          collected.push(row);
+        }
+        rows = collected;
+      } else {
+        rows = stmt.all(...args) ?? [];
+      }
       if (columns.length === 0 && rows.length > 0) {
         columns = Object.keys(rows[0]);
       }
       const tookMs = Math.round((performance.now() - start) * 100) / 100;
-      return { columns, rows, rowCount: rows.length, tookMs };
+      const result: QueryResult = { columns, rows, rowCount: rows.length, tookMs };
+      if (truncated) result.truncated = true;
+      return result;
     }
 
     // 写/DDL 语句：用 run() 取 changes（受影响行数），
@@ -101,6 +128,14 @@ export class SqliteDriver implements IDriver {
       tables.push({ name, columns });
     }
     return { tables };
+  }
+
+  /**
+   * SQLite（node:sqlite）是同步 API，查询期间会阻塞主线程，
+   * 取消请求根本排不进来——如实返回 false，由主进程标记「已取消」并在结果返回后丢弃。
+   */
+  async cancel(): Promise<boolean> {
+    return false;
   }
 
   async close(): Promise<void> {

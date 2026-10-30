@@ -199,6 +199,8 @@ export type DbErrorCode =
   | 'CONFIRM_REQUIRED'
   | 'MULTI_STATEMENT_REJECTED'
   | 'UNSUPPORTED_TYPE'
+  /** 语句类型不支持该操作（如对写语句请求执行计划） */
+  | 'UNSUPPORTED'
   | 'UNKNOWN';
 
 export interface DbError {
@@ -251,6 +253,10 @@ export const IPC = {
   QueryReadonly: 'db:query-readonly',
   /** 执行 SQL（含写操作），写/DDL 由主进程按只读开关与危险级别裁决 */
   Execute: 'db:execute',
+  /** 取消当前连接上正在执行的查询 */
+  QueryCancel: 'db:query-cancel',
+  /** 查看执行计划（仅允许对查询语句 EXPLAIN，结果信封同 ExecuteOutcome） */
+  Explain: 'db:explain',
   ListConnections: 'db:list-connections',
   TestConnection: 'db:test',
   /** 编辑模式下测试：密码留空时用已保存密码补齐 */
@@ -478,6 +484,8 @@ export interface AiTestResult {
 export type ExecuteOutcome =
   | { status: 'ok'; result: QueryResult }
   | { status: 'confirm'; sql: string; analysis: SqlAnalysis }
+  /** 用户主动取消：查询已中断，不写入执行历史 */
+  | { status: 'cancelled' }
   | { status: 'error'; code: DbErrorCode; message: string };
 
 /** AI 对话结果信封 */

@@ -44,6 +44,12 @@ const api = {
    */
   execute: (id: string, sql: string, confirmed = false, record = true): Promise<ExecuteOutcome> =>
     ipcRenderer.invoke(IPC.Execute, id, sql, confirmed, record),
+  /** 取消该连接上正在执行的查询 */
+  cancelQuery: (id: string): Promise<{ ok: boolean; interrupted?: boolean; message?: string }> =>
+    ipcRenderer.invoke(IPC.QueryCancel, id),
+  /** 查看执行计划（仅查询语句） */
+  explain: (id: string, sql: string): Promise<ExecuteOutcome> =>
+    ipcRenderer.invoke(IPC.Explain, id, sql),
   listConnections: () => ipcRenderer.invoke(IPC.ListConnections),
   test: (config: IConnectionConfig) => ipcRenderer.invoke(IPC.TestConnection, config),
   testExisting: (id: string, config: IConnectionConfig) =>
