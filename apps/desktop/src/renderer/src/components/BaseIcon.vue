@@ -44,7 +44,7 @@ export type IconName =
   | 'filter'
   | 'chart'
   | 'file'
-  | 'logo';
+  | 'brand';
 
 const props = withDefaults(
   defineProps<{
@@ -58,7 +58,7 @@ const props = withDefaults(
 /**
  * 每个图标是 24×24 viewBox 内的 svg 片段。
  * 默认父级 svg 设 fill=none / stroke=currentColor（线性风格）；
- * 需要填充的局部（play 三角、logo 火花）在片段内联 fill/stroke 覆盖即可。
+ * 需要填充的局部（play 三角、应用徽标）在片段内联 fill/stroke 覆盖即可。
  */
 const PATHS: Record<IconName, string> = {
   lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
@@ -100,8 +100,33 @@ const PATHS: Record<IconName, string> = {
     '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
   file:
     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/>',
-  logo:
-    '<ellipse cx="12" cy="5.5" rx="8.5" ry="2.8"/><path d="M3.5 5.5v13c0 1.55 3.8 2.8 8.5 2.8s8.5-1.25 8.5-2.8v-13"/><path d="M10 8.4a3 3 0 1 1 4.2 2.7c-.6.4-1.2.9-1.2 1.8"/><path d="M12 16.4h.01"/>',
+  /**
+   * 应用徽标（自绘彩色版，与应用图标 icon.svg 同一造型）：
+   * 深蓝圆角底板 + 蓝色渐变数据库圆柱 + 负形问号。
+   * 几何由 1024 版图标按 24/1024 等比缩放而来，保证与 Dock / 安装包图标观感一致。
+   * 片段内元素均自带 fill / stroke，不受父级 stroke=currentColor 影响。
+   */
+  brand: `
+    <defs>
+      <linearGradient id="kxBrandBg" x1="0" y1="0" x2="0.87" y2="1">
+        <stop offset="0" stop-color="#1E2635"/>
+        <stop offset="0.55" stop-color="#141A27"/>
+        <stop offset="1" stop-color="#0A0D15"/>
+      </linearGradient>
+      <linearGradient id="kxBrandDb" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#7CC2FF"/>
+        <stop offset="0.5" stop-color="#2F7EEB"/>
+        <stop offset="1" stop-color="#1350AC"/>
+      </linearGradient>
+    </defs>
+    <rect x="0.6" y="0.6" width="22.8" height="22.8" rx="5.2" fill="url(#kxBrandBg)" stroke="none"/>
+    <ellipse cx="12" cy="16.4" rx="5.4" ry="1.7" fill="#1758BE" stroke="none"/>
+    <rect x="6.6" y="8.3" width="10.8" height="8.1" fill="url(#kxBrandDb)" stroke="none"/>
+    <ellipse cx="12" cy="8.3" rx="5.4" ry="1.7" fill="#7CC2FF" stroke="none"/>
+    <path d="M10.2 12.8C10.2 11.4 11 10.7 12 10.7C13 10.7 13.8 11.4 13.8 12.8C13.8 13.6 12 13.8 12 14.3"
+          fill="none" stroke="#161D2A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="12" cy="16.1" r="0.85" fill="#161D2A" stroke="none"/>
+  `,
 };
 
 const inner = computed<string>(() => PATHS[props.name] ?? '');

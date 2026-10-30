@@ -33,3 +33,9 @@ pnpm-debug.log*
 商业模式-成本与收费点分析.md
 中转站收费模式与架构权衡.md
 扩展能力竞品扫描与扩展架构.md
+
+# ---- 打包资源例外：应用图标必须入库，否则 clone / CI 打包缺图标 ----
+!apps/desktop/build/
+!apps/desktop/build/*.svg
+!apps/desktop/build/*.png
+!apps/desktop/build/*.icns

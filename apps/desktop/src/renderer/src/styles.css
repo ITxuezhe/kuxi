@@ -246,11 +246,11 @@ textarea:disabled {
   justify-content: center;
   width: calc(22px * var(--font-scale));
   height: calc(22px * var(--font-scale));
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: var(--on-primary);
-  font-size: calc(12px * var(--font-scale));
-  font-weight: 700;
+  /* 彩色徽标由 BaseIcon name="brand" 自绘（含深蓝底板与圆角），
+     这里只负责尺寸，不再用主题色方块兜底 */
+}
+.brand-mark .base-icon {
+  display: block;
 }
 .brand-sub {
   color: var(--muted);

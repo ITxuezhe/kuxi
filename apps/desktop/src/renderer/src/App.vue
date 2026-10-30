@@ -682,7 +682,7 @@ onMounted(async () => {
       </button>
 
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true"><BaseIcon name="logo" :size="18" /></span>
+        <span class="brand-mark" aria-hidden="true"><BaseIcon name="brand" size="100%" /></span>
         <span>库犀</span>
         <span class="brand-sub">用大白话问数据库</span>
       </div>

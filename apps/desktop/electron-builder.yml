@@ -28,6 +28,7 @@ npmRebuild: false
 
 mac:
   category: public.app-category.developer-tools
+  icon: build/icon.icns
   target:
     - target: dmg
       arch: [arm64, x64]
@@ -37,14 +38,15 @@ mac:
   # 本地开发机通常没有 Apple Developer 证书，这里跳过签名以便能打出包。
   # 正式分发时删掉 identity: null，并配置 CSC_LINK / CSC_KEY_PASSWORD + 公证（notarize）。
   identity: null
-  # dmg 的卷标
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  # 文件名用 ASCII，避免下载链接/第三方 CDN 对中文名做编码时出错（应用内名称仍是「库犀」）
+  artifactName: Kuxi-${version}-${arch}.${ext}
 
 win:
+  icon: build/icon.png
   target:
     - target: nsis
       arch: [x64]
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: Kuxi-${version}-${arch}.${ext}
 
 nsis:
   oneClick: false
@@ -55,15 +57,18 @@ nsis:
   deleteAppDataOnUninstall: false
 
 linux:
+  icon: build/icon.png
   target:
     - target: AppImage
       arch: [x64]
   category: Development
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: Kuxi-${version}-${arch}.${ext}
 
-# 更新源：generic 服务器（放最新版安装包 + latest.yml / latest-mac.yml 即可）。
-# ⚠️ 正式发布前把 url 换成真实地址；也可临时用命令行覆盖而无需改文件：
-#   pnpm dist -- --config.publish.url=https://your-cdn/kuxi
+# 更新源：GitHub Releases。
+# 打包时会生成 app-update.yml（owner/repo），应用内 electron-updater 直接读该仓库
+# 最新 Release 的 latest-mac.yml / latest.yml 做版本比对与增量下载。
+# 发版流程：打 tag（如 v0.1.1）→ 构建 → 把安装包 + latest*.yml 一起上传到对应 Release。
 publish:
-  provider: generic
-  url: https://updates.kuxi.app/desktop
+  provider: github
+  owner: ITxuezhe
+  repo: kuxi

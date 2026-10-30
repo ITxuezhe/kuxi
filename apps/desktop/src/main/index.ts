@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain } from 'electron';
 import { join } from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import {
@@ -496,6 +496,11 @@ app.whenReady().then(() => {
     return;
   }
   createWindow();
+  // 开发模式下 Dev Dock 图标跟随应用 logo（打包后由 .app 内的 icns 提供）
+  if (!app.isPackaged && process.platform === 'darwin') {
+    const iconPath = join(__dirname, '../../build/icon.png');
+    if (existsSync(iconPath)) app.dock?.setIcon(iconPath);
+  }
   // 窗口建好后再初始化更新器（状态广播需要接收方）
   initUpdater();
   app.on('activate', () => {
