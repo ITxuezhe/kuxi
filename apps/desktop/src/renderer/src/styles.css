@@ -2442,6 +2442,22 @@ button.danger:hover:not(:disabled) {
 .conn-modal {
   width: min(640px, 94vw);
   max-width: min(640px, 94vw);
+  /* 由 .modal-body 单独滚动，弹窗本身不再滚动，头部与操作条常驻 */
+  overflow: hidden;
+}
+.conn-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 0;
+}
+/* 「测试连接 / 保存」吸附在滚动区底部：展开 SSH 等长表单时也不会被滚走 */
+.conn-modal .actions {
+  position: sticky;
+  bottom: 0;
+  margin: var(--gap-sm) calc(-1 * var(--pad-panel)) 0;
+  padding: var(--gap-sm) var(--pad-panel) var(--gap);
+  background: var(--panel);
 }
 .confirm-message {
   margin: 0;

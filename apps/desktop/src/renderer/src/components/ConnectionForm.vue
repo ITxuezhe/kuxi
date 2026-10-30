@@ -73,6 +73,15 @@ const touched = reactive<Record<string, boolean>>({
 });
 
 const portTouched = ref(false);
+/** 名称是否被用户改过：没改过时切换类型自动跟随默认名称 */
+const nameTouched = ref(false);
+
+/** 各类型新建时的默认连接名 */
+const DEFAULT_NAMES: Record<DbType, string> = {
+  sqlite: '本地 SQLite',
+  mysql: '本地 MySQL',
+  postgres: '本地 PostgreSQL',
+};
 
 const testing = ref(false);
 const saving = ref(false);
@@ -159,6 +168,8 @@ function hydrateFromInitial(): void {
   form.sshPassword = '';
   form.sshPassphrase = '';
   portTouched.value = false;
+  // 编辑已有连接：名称保持原样，不随类型切换被覆盖
+  nameTouched.value = true;
 }
 
 // 组件每次随弹窗 v-if 重新创建，setup 里按 mode 初始化一次即可
@@ -166,10 +177,11 @@ if (isEdit.value) {
   hydrateFromInitial();
 }
 
-// 切换类型：端口未被用户手动编辑过时，自动跟随该类型默认端口
+// 切换类型：名称/端口未被用户手动改过时，自动跟随该类型默认值
 watch(
   () => form.type,
   (next: DbType) => {
+    if (!nameTouched.value) form.name = DEFAULT_NAMES[next];
     if (next === 'sqlite') return;
     const current = Number(form.port);
     const userProvidedPort = portTouched.value && Number.isFinite(current) && current > 0;
@@ -294,7 +306,11 @@ function applyParsed(p: Record<string, unknown>): void {
   if (type === 'sqlite' || type === 'mysql' || type === 'postgres') {
     form.type = type;
   }
-  if (typeof p.name === 'string' && p.name.trim()) form.name = p.name.trim();
+  if (typeof p.name === 'string' && p.name.trim()) {
+    form.name = p.name.trim();
+    // AI 给出的名称算用户指定，后续切换类型不再覆盖
+    nameTouched.value = true;
+  }
   if (type === 'sqlite') {
     form.filename =
       typeof p.filename === 'string' && p.filename.trim() ? p.filename.trim() : ':memory:';
@@ -395,6 +411,7 @@ async function onAiFill(): Promise<void> {
           v-model="form.name"
           type="text"
           placeholder="例如：本地测试库"
+          @input="nameTouched = true"
           :aria-invalid="showError('name')"
           aria-describedby="conn-name-error"
           @blur="touch('name')"
