@@ -36,10 +36,27 @@ mac:
     - target: zip
       arch: [arm64, x64]
   # 本地开发机通常没有 Apple Developer 证书，这里跳过签名以便能打出包。
-  # 正式分发时删掉 identity: null，并配置 CSC_LINK / CSC_KEY_PASSWORD + 公证（notarize）。
+  # ★ 配真实证书时必须删掉这一行：identity: null 会强制关闭 electron-builder 的签名流程
+  #   （即使设了 CSC_LINK 也不会签），而 afterPack 里的 ad-hoc 脚本又会因检测到 CSC_LINK 跳过，
+  #   最终产物反而变成「完全未签名」。
   identity: null
+  # Electron JIT 相关权限（V8 需要，缺了渲染进程会崩）。
+  # 不写显式 entitlements 路径：build/entitlements.mac.plist 会被自动识别；
+  # 写成相对路径会被按当前工作目录解析到 apps/desktop/ 下，真正签名时读不到文件。
   # 文件名用 ASCII，避免下载链接/第三方 CDN 对中文名做编码时出错（应用内名称仍是「库犀」）
   artifactName: Kuxi-${version}-${arch}.${ext}
+
+# ad-hoc 签名（零成本，不需要任何证书）：
+# afterPack 在 electron-builder 自身签名之前、zip/dmg 打包之前执行，
+# 所以最终产物里的 .app 是「签名完整」的，Gatekeeper 不会再报「应用已损坏」，
+# 只会提示「无法验证开发者」（右键打开一次即可）。
+# 配了真实证书（CSC_LINK）时脚本会自动跳过，交给 electron-builder 用 Developer ID 签
+# （前提是上面 identity: null 已删除，否则两边都不会签，产物退回「完全未签名」）。
+# 局限：ad-hoc 没有开发者身份、无法公证，Squirrel.Mac 不接受它产出的更新包（签名校验绑定 cdhash），
+# 所以 macOS 自动更新默认关闭，需要时用环境变量 KUXI_MAC_AUTOUPDATE=1 打开（见 src/main/updater.ts）。
+# 注意：afterPack 是顶层配置项，不能放进 mac: 里（schema 校验会失败）。
+# 脚本内部会按 electronPlatformName 自行跳过非 macOS 平台。
+afterPack: ./scripts/sign-mac-adhoc.cjs
 
 # DMG 制作（electron-builder 不参与，手动跑）：
 #   cd apps/desktop/dist

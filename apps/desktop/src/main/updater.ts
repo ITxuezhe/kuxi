@@ -51,6 +51,18 @@ function normalizeNotes(info: UpdateInfo): string | undefined {
   return undefined;
 }
 
+const MAC_UPDATE_HINT = '当前 macOS 安装包未使用 Developer ID 签名，无法自动更新；请到官网下载新版本';
+
+/**
+ * macOS 自动更新开关（默认关闭）。
+ * ad-hoc 签名的包会被 Squirrel.Mac 拒绝应用更新：更新校验要求新包签名满足当前应用的
+ * designated requirement，而 ad-hoc 的要求绑定 cdhash，新版本必然对不上。
+ * 只有在确认真实 Developer ID 签名 + 公证后才用 KUXI_MAC_AUTOUPDATE=1 打开。
+ */
+function macUpdateDisabled(): boolean {
+  return process.platform === 'darwin' && process.env.KUXI_MAC_AUTOUPDATE !== '1';
+}
+
 /**
  * 初始化更新器：绑定事件 + 启动 10 秒后静默检查一次。
  * 由 app.whenReady 之后调用（此时窗口已创建，广播才有接收方）。
@@ -62,6 +74,11 @@ export function initUpdater(): void {
 
   if (!app.isPackaged) {
     emit({ state: 'disabled', message: '开发模式下不检查更新，打包安装后生效' });
+    return;
+  }
+
+  if (macUpdateDisabled()) {
+    emit({ state: 'disabled', message: MAC_UPDATE_HINT });
     return;
   }
 
@@ -126,6 +143,9 @@ function friendlyError(err: unknown): string {
 export async function checkForUpdates(): Promise<UpdateStatus> {
   if (!app.isPackaged) {
     return emit({ state: 'disabled', message: '开发模式下不检查更新，打包安装后生效' });
+  }
+  if (macUpdateDisabled()) {
+    return emit({ state: 'disabled', message: MAC_UPDATE_HINT });
   }
   if (status.state === 'checking' || status.state === 'downloading') return status;
 
