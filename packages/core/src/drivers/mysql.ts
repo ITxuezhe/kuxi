@@ -203,18 +203,24 @@ export class MysqlDriver implements IDriver {
     const tables: TableInfo[] = [];
     for (const name of names) {
       // column_type 带 full 定义（varchar(255) / enum('a','b') / int unsigned），
-      // data_type 是裸类型名（varchar）——重建表时丢长度会直接 1064
+      // 重建表时丢长度会直接 1064。
+      // 注意：information_schema 的列名本身是大写（COLUMN_NAME / IS_NULLABLE …），
+      // mysql2 把服务端字段名原样作为行对象的 key，所以这里一律起小写别名，
+      // 映射层只读别名——直接读 column_name 之类会恒为 undefined。
       const cols = await this.query(
-        `SELECT column_name, column_type, EXTRA AS column_extra, is_nullable, column_key, column_default
+        `SELECT column_name AS name, column_type AS full_type, EXTRA AS column_extra,
+                is_nullable AS nullable_flag, column_key AS primary_key_flag,
+                column_default AS default_value
          FROM information_schema.columns WHERE table_schema = ? AND table_name = ?`,
         [this.config.database, name],
       );
       const columns: ColumnInfo[] = cols.rows.map((r) => ({
-        name: String(r.column_name),
-        type: String(r.column_type ?? r.data_type ?? ''),
-        nullable: String(r.is_nullable) === 'YES',
-        primaryKey: String(r.column_key) === 'PRI',
-        defaultValue: r.column_default === null ? null : String(r.column_default),
+        name: String(r.name),
+        type: String(r.full_type ?? ''),
+        nullable: String(r.nullable_flag) === 'YES',
+        primaryKey: String(r.primary_key_flag) === 'PRI',
+        defaultValue:
+          r.default_value === null || r.default_value === undefined ? null : String(r.default_value),
         autoIncrement: /auto_increment/i.test(String(r.column_extra ?? '')),
       }));
       tables.push({ name, columns });
@@ -223,37 +229,40 @@ export class MysqlDriver implements IDriver {
     // 视图 / 存储过程与函数 / 触发器：information_schema 各一次全量查询
     const views: ViewInfo[] = (
       await this.query(
-        `SELECT table_name AS name, view_definition
+        `SELECT table_name AS name, view_definition AS definition
          FROM information_schema.views WHERE table_schema = ? ORDER BY table_name`,
         [this.config.database],
       )
-    ).rows.map((r) => ({ name: String(r.name), definition: String(r.view_definition ?? '') }));
+    ).rows.map((r) => ({ name: String(r.name), definition: String(r.definition ?? '') }));
 
     const routines: RoutineInfo[] = (
       await this.query(
-        `SELECT routine_name AS name, routine_type, dtd_identifier AS return_type, routine_definition
+        `SELECT routine_name AS name, routine_type AS kind,
+                dtd_identifier AS return_type, routine_definition AS definition
          FROM information_schema.routines WHERE routine_schema = ? ORDER BY routine_name`,
         [this.config.database],
       )
     ).rows.map((r) => ({
       name: String(r.name),
-      kind: String(r.routine_type).toUpperCase() === 'PROCEDURE' ? 'procedure' : 'function',
+      kind: String(r.kind).toUpperCase() === 'PROCEDURE' ? 'procedure' : 'function',
       returnType: r.return_type === null || r.return_type === undefined ? undefined : String(r.return_type),
-      definition: r.routine_definition === null ? undefined : String(r.routine_definition),
+      definition: r.definition === null || r.definition === undefined ? undefined : String(r.definition),
     }));
 
     const triggers: TriggerInfo[] = (
       await this.query(
-        `SELECT trigger_name AS name, action_timing, event_manipulation AS event, event_object_table AS tbl, action_statement
+        `SELECT trigger_name AS name, action_timing AS timing,
+                event_manipulation AS event, event_object_table AS tbl,
+                action_statement AS definition
          FROM information_schema.triggers WHERE trigger_schema = ? ORDER BY trigger_name`,
         [this.config.database],
       )
     ).rows.map((r) => ({
       name: String(r.name),
-      timing: String(r.action_timing ?? '').toUpperCase(),
+      timing: String(r.timing ?? '').toUpperCase(),
       event: String(r.event ?? '').toUpperCase(),
       table: String(r.tbl ?? ''),
-      definition: String(r.action_statement ?? ''),
+      definition: String(r.definition ?? ''),
     }));
 
     return { tables, views, routines, triggers };
