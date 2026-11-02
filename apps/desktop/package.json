@@ -2,6 +2,7 @@
   "name": "@kuxi/desktop",
   "version": "0.1.1",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE",
   "description": "库犀 — 面向开发者的桌面数据库客户端",
   "author": {
     "name": "库犀",
