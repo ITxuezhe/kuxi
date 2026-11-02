@@ -670,7 +670,7 @@
       <div class="sec-head reveal">
         <div class="kicker">Download</div>
         <h2>下载安装包</h2>
-        <p class="sub">macOS（Apple Silicon / Intel）与 Windows x64 均提供安装包，应用内自带自动更新。Linux 在路上。</p>
+        <p class="sub">macOS（Apple Silicon / Intel）与 Windows x64 均提供安装包。Windows 版应用内自带自动更新；macOS 版受签名限制，请重新下载覆盖。Linux 在路上。</p>
       </div>
 
       <div class="dl-panel reveal">
@@ -711,17 +711,29 @@
 
         <div class="dl-note">
           <span>macOS 11+ / Windows 10、11</span>
-          <span>应用内自带自动更新</span>
-          <span>未签名版本，首次打开见下方说明</span>
+          <span>Windows 内置自动更新 · macOS 请重新下载覆盖</span>
+          <span>macOS 已做 ad-hoc 签名，不再提示「已损坏」</span>
         </div>
 
-        <div class="cmd">
-          <span id="cmd-text">xattr -dr com.apple.quarantine /Applications/库犀.app</span>
+        <div class="cmd" style="margin-top:26px">
+          <span id="cmd-text">curl -fsSL https://raw.githubusercontent.com/ITxuezhe/kuxi/master/scripts/install-mac.sh | bash</span>
           <button type="button" id="copy-btn">复制</button>
         </div>
         <p style="margin-top:12px;font-size:13px;color:var(--muted-2)">
-          当前安装包未做代码签名。<b>macOS</b>：若提示「无法验证开发者」或「已损坏」，用上方命令，或在 Finder 里右键「库犀」→「打开」。
-          <b>Windows</b>：若 SmartScreen 拦截，点「更多信息」→「仍要运行」即可。
+          <b>macOS 推荐用法</b>：在「终端」里粘贴上面这条命令。它会自动识别芯片、下载对应安装包、校验 SHA256、装进「应用程序」并去掉隔离标记，
+          全程没有拦截弹窗；也不需要 sudo（/Applications 不可写时改装到 ~/Applications）。
+        </p>
+        <p style="margin-top:10px;font-size:13px;color:var(--muted-2)">
+          <b>手动安装 macOS</b>：安装包做了 ad-hoc 本地签名，不会再提示「已损坏」；若提示「无法验证开发者」，
+          在 Finder 里右键「库犀」→「打开」即可。若仍提示「已损坏」，执行
+          <code style="font-size:12px;color:#B9C4D8;background:#161A21;padding:2px 6px;border-radius:5px">xattr -dr com.apple.quarantine /Applications/库犀.app</code>。
+        </p>
+        <p style="margin-top:10px;font-size:13px;color:var(--muted-2)">
+          <b>Windows</b>：SmartScreen 拦截时点「更多信息」→「仍要运行」。想确认安装包没被篡改，可在 Release 页下载
+          <code style="font-size:12px;color:#B9C4D8;background:#161A21;padding:2px 6px;border-radius:5px">SHA256SUMS.txt</code>，
+          再用 PowerShell 的
+          <code style="font-size:12px;color:#B9C4D8;background:#161A21;padding:2px 6px;border-radius:5px">Get-FileHash .\Kuxi-&lt;版本&gt;-x64.exe -Algorithm SHA256</code>
+          对照。
         </p>
       </div>
     </div>
@@ -750,6 +762,14 @@
         <details>
           <summary>为什么包这么大？</summary>
           <div class="ans">Electron 运行时本身约 90 MB。换来的是跨平台一致的原生窗口、成熟的自动更新和加密存储。<a href="#compare">竞品里有更轻的方案</a>，代价通常是数据源广度或中文体验。</div>
+        </details>
+        <details>
+          <summary>macOS 为什么提示「无法验证开发者」？</summary>
+          <div class="ans">安装包做了 ad-hoc 本地签名，能证明应用本身没被破坏，所以不会再提示「已损坏」；但 ad-hoc 没有 Apple 开发者身份，Gatekeeper 仍要你确认一次。用页面上的安装命令可以完全跳过这一步，或在 Finder 里右键「库犀」→「打开」。</div>
+        </details>
+        <details>
+          <summary>macOS 版能自动更新吗？</summary>
+          <div class="ans">不能。自动更新要求新包的签名能匹配开发者身份，ad-hoc 签名做不到，所以 macOS 版请重新下载安装包覆盖（连接与配置都会保留）。Windows 版不受影响，仍走应用内自动更新。</div>
         </details>
         <details>
           <summary>能商用吗？</summary>
