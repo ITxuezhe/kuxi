@@ -1,6 +1,6 @@
 {
   "name": "@kuxi/desktop",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "description": "库犀 — 面向开发者的桌面数据库客户端",
@@ -14,10 +14,10 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "test": "vitest run --config vitest.config.ts",
-    "dist": "electron-vite build && electron-builder",
-    "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:win": "electron-vite build && electron-builder --win",
-    "dist:linux": "electron-vite build && electron-builder --linux",
+    "dist": "electron-vite build && electron-builder --publish never",
+    "dist:mac": "electron-vite build && electron-builder --mac --publish never",
+    "dist:win": "electron-vite build && electron-builder --win --publish never",
+    "dist:linux": "electron-vite build && electron-builder --linux --publish never",
     "dist:dir": "electron-vite build && electron-builder --dir",
     "sign:mac": "node scripts/sign-mac-adhoc.cjs"
   },

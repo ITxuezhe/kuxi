@@ -7,6 +7,8 @@
 import QueryTab from './QueryTab.vue';
 import DataTab from './DataTab.vue';
 import DesignTab from './DesignTab.vue';
+import PipelineTab from './PipelineTab.vue';
+import BaseIcon from './BaseIcon.vue';
 import { useWorkbench } from '../composables/useWorkbench';
 
 const wb = useWorkbench();
@@ -15,6 +17,7 @@ const KIND_LABEL: Record<string, string> = {
   query: '查',
   data: '数',
   design: '设',
+  pipeline: '管',
 };
 
 function kindLabel(kind: string): string {
@@ -44,12 +47,16 @@ function kindLabel(kind: string): string {
       <button class="tab-add" type="button" title="新查询（Ctrl/Cmd+T）" @click="wb.newQuery()">
         ＋
       </button>
+      <button class="tab-add" type="button" title="新数据管线" aria-label="新数据管线" @click="wb.openPipeline()">
+        <BaseIcon name="workflow" :size="14" />
+      </button>
     </div>
 
     <div class="tab-panel">
       <QueryTab v-if="wb.activeTab.value && wb.activeTab.value.kind === 'query'" :tab="wb.activeTab.value" :key="wb.activeTab.value.id" />
       <DataTab v-else-if="wb.activeTab.value && wb.activeTab.value.kind === 'data'" :tab="wb.activeTab.value" :key="wb.activeTab.value.id" />
       <DesignTab v-else-if="wb.activeTab.value && wb.activeTab.value.kind === 'design'" :tab="wb.activeTab.value" :key="wb.activeTab.value.id" />
+      <PipelineTab v-else-if="wb.activeTab.value && wb.activeTab.value.kind === 'pipeline'" :tab="wb.activeTab.value" :key="wb.activeTab.value.id" />
       <div v-else class="workbench-empty">
         <p>选择一个连接，或点击右上角「＋ 新建查询」开始。</p>
         <p class="muted">双击左侧表名可在此打开数据网格；右键表名可「打开数据 / 设计表」。</p>

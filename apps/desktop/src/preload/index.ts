@@ -20,6 +20,11 @@ import type {
   ImportProgress,
   ImportReparseRequest,
   ImportRunRequest,
+  PipelineDoc,
+  PipelineNodeInfo,
+  PipelineRunOutcome,
+  PipelineRunRequest,
+  PluginInfo,
   UpdateStatus,
 } from '@kuxi/shared';
 
@@ -108,6 +113,23 @@ const api = {
       ipcRenderer.removeListener(IPC.ImportProgress, handler);
     };
   },
+
+  // ---- 数据管线（节点清单 / 保存 / 重放执行）----
+  pipelineNodes: (): Promise<PipelineNodeInfo[]> => ipcRenderer.invoke(IPC.PipelineNodes),
+  pipelineList: (): Promise<PipelineDoc[]> => ipcRenderer.invoke(IPC.PipelineList),
+  /** 新建/覆盖保存（空 id 由主进程补），返回更新后的完整列表 */
+  pipelineUpsert: (doc: PipelineDoc): Promise<PipelineDoc[]> =>
+    ipcRenderer.invoke(IPC.PipelineUpsert, doc),
+  pipelineDelete: (id: string): Promise<PipelineDoc[]> => ipcRenderer.invoke(IPC.PipelineDelete, id),
+  pipelineRun: (req: PipelineRunRequest): Promise<PipelineRunOutcome> =>
+    ipcRenderer.invoke(IPC.PipelineRun, req),
+
+  // ---- 插件系统（清单 / 重载 / 打开插件目录）----
+  pluginList: (): Promise<PluginInfo[]> => ipcRenderer.invoke(IPC.PluginList),
+  /** 重新加载 userData/plugins/*.js，返回更新后的完整清单 */
+  pluginReload: (): Promise<PluginInfo[]> => ipcRenderer.invoke(IPC.PluginReload),
+  pluginOpenDir: (): Promise<{ ok: boolean; message?: string }> =>
+    ipcRenderer.invoke(IPC.PluginOpenDir),
 
   // ---- 自动更新 ----
   checkUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.UpdateCheck),

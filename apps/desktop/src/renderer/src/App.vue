@@ -15,6 +15,8 @@ import ConfirmModal from './components/ConfirmModal.vue';
 import AiPanel from './components/AiPanel.vue';
 import HistoryPanel from './components/HistoryPanel.vue';
 import AiSettings from './components/AiSettings.vue';
+import PluginsDialog from './components/PluginsDialog.vue';
+import TopbarMore from './components/TopbarMore.vue';
 import QueryBuilder from './components/QueryBuilder.vue';
 import SchemaTree from './components/SchemaTree.vue';
 import InfoDialog from './components/InfoDialog.vue';
@@ -62,6 +64,32 @@ const pendingTab = ref<WorkbenchTab | null>(null);
 /** AI 抽屉与配置 */
 const aiOpen = ref(false);
 const aiSettingsOpen = ref(false);
+/** 插件管理对话框 */
+const pluginsOpen = ref(false);
+
+/** 顶栏「更多」下拉的动作分发（收纳历史/构建/模板/导入/插件/指南） */
+function handleMoreAction(name: 'history' | 'builder' | 'templates' | 'import' | 'plugins' | 'guide'): void {
+  switch (name) {
+    case 'history':
+      toggleHistory();
+      break;
+    case 'builder':
+      openBuilder('');
+      break;
+    case 'templates':
+      openTemplates();
+      break;
+    case 'import':
+      openImport('');
+      break;
+    case 'plugins':
+      pluginsOpen.value = true;
+      break;
+    case 'guide':
+      guideOpen.value = true;
+      break;
+  }
+}
 /** 历史/收藏抽屉 */
 const historyOpen = ref(false);
 
@@ -743,54 +771,11 @@ onMounted(async () => {
           <BaseIcon name="sparkles" :size="15" />
           <span>AI</span>
         </button>
-        <button
-          class="ghost icon-lead"
-          :class="{ 'is-on': historyOpen }"
-          type="button"
-          :aria-pressed="historyOpen"
-          title="执行历史与收藏：点一条即可回填编辑器"
-          @click="toggleHistory"
-        >
-          <BaseIcon name="clock" :size="15" />
-          <span>历史</span>
-        </button>
-        <button
-          class="ghost icon-lead"
-          type="button"
-          title="可视化查询构建器：勾字段、加筛选，自动生成 SQL"
-          @click="openBuilder('')"
-        >
-          <BaseIcon name="filter" :size="15" />
-          <span>构建</span>
-        </button>
-        <button
-          class="ghost icon-lead"
-          type="button"
-          title="操作模板：常用查询、清理重复、补空值"
-          @click="openTemplates"
-        >
-          <BaseIcon name="file" :size="15" />
-          <span>模板</span>
-        </button>
-        <button
-          class="ghost icon-lead"
-          type="button"
-          :disabled="!connected"
-          title="导入 CSV / Excel 数据到当前数据库"
-          @click="openImport('')"
-        >
-          <BaseIcon name="upload" :size="15" />
-          <span>导入</span>
-        </button>
-        <button
-          class="icon-btn"
-          type="button"
-          title="使用指南"
-          aria-label="使用指南"
-          @click="guideOpen = true"
-        >
-          <BaseIcon name="info" :size="16" />
-        </button>
+        <TopbarMore
+          :history-open="historyOpen"
+          :connected="connected"
+          @action="handleMoreAction"
+        />
         <ThemeSwitcher />
         <button
           class="primary"
@@ -975,6 +960,9 @@ onMounted(async () => {
 
     <!-- AI 配置 -->
     <AiSettings :open="aiSettingsOpen" @close="aiSettingsOpen = false" />
+
+    <!-- 插件管理 -->
+    <PluginsDialog :open="pluginsOpen" @close="pluginsOpen = false" />
 
     <!-- CSV / Excel 导入向导 -->
     <ImportWizard

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -41,6 +41,8 @@ import { aiChat, aiTest, chatEndpoint, getAiConfigPublic, saveAiConfig } from '.
 import { initUpdater, registerUpdateIpc } from './updater';
 import { clearHistory, deleteHistory, listHistory, recordHistory, toggleFavorite } from './history';
 import { registerImportIpc } from './import';
+import { registerPipelineIpc } from './pipeline';
+import { getPluginsDir, listPlugins, loadUserPlugins, reloadUserPlugins } from './plugins';
 
 const manager = new ConnectionManager();
 
@@ -688,11 +690,28 @@ function registerIpc(): void {
     },
     isReadOnly: () => getSettings().readOnly,
   });
+
+  // ---- 数据管线（节点清单 / 保存 / 重放执行 / 维护节点写回）----
+  registerPipelineIpc(harness, { manager, isReadOnly: () => getSettings().readOnly });
+
+  // ---- 插件系统（清单 / 重载 / 打开插件目录）----
+  ipcMain.handle(IPC.PluginList, (): unknown => listPlugins(harness));
+  ipcMain.handle(IPC.PluginReload, async (): Promise<unknown> => {
+    await reloadUserPlugins(harness);
+    return listPlugins(harness);
+  });
+  ipcMain.handle(IPC.PluginOpenDir, async (): Promise<{ ok: boolean; message?: string }> => {
+    const err = await shell.openPath(getPluginsDir());
+    return err ? { ok: false, message: err } : { ok: true };
+  });
 }
 
 app.whenReady().then(() => {
   registerIpc();
   registerUpdateIpc();
+  // 用户插件加载是异步的（createRequire + mount），不阻塞窗口创建；
+  // 加载失败只记清单 error，插件对话框里可见
+  void loadUserPlugins(harness);
   // --smoke：在 Electron 运行时内跑真实 core 的端到端自检（不创建窗口）
   if (process.argv.includes('--smoke')) {
     void runSmoke();

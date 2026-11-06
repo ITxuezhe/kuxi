@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0A0D15" />
 <title>库犀 KuXi · 用大白话问数据库</title>
 <meta name="description" content="库犀是一款本地优先的 AI 数据库工作台。不会写 SQL 也能连库、提问、改表、导出数据；连接密码与 AI Key 都留在本机。" />
 <meta property="og:title" content="库犀 KuXi · 用大白话问数据库" />
@@ -24,7 +25,7 @@
     --line-soft: #1E2431;
     --text: #E4E7EE;
     --muted: #8B93A7;
-    --muted-2: #5E6678;
+    --muted-2: #768093;
     --blue: #2F7EEB;
     --blue-lt: #7CC2FF;
     --blue-deep: #1350AC;
@@ -57,6 +58,15 @@
   a:hover { color: #A5D6FF; }
   code, pre { font-family: var(--mono); }
   ::selection { background: rgba(47, 126, 235, .35); }
+  :focus-visible { outline: 2px solid var(--blue-lt); outline-offset: 2px; }
+
+  /* 键盘用户跳转链接 */
+  .skip {
+    position: absolute; left: -9999px; top: 0; z-index: 99;
+    background: var(--panel-2); color: var(--text);
+    padding: 10px 18px; border-radius: 0 0 10px 0; font-size: 14px;
+  }
+  .skip:focus { left: 0; }
 
   .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
 
@@ -370,12 +380,13 @@
   .foot-r { display: flex; gap: 22px; font-size: 13px; color: var(--muted-2); }
   .foot-r a { color: var(--muted); }
 
-  /* 入场动画（滚动触发） */
-  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .2, 1); }
-  .reveal.in { opacity: 1; transform: none; }
+  /* 入场动画（滚动触发）：隐藏态仅在 JS 可用时生效，无 JS / 无 IO 时内容始终可见 */
+  .js .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .2, 1); }
+  .js .reveal.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
     * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-    .reveal { opacity: 1; transform: none; }
+    .js .reveal { opacity: 1; transform: none; }
     .win { transform: none; }
   }
 
@@ -402,8 +413,10 @@
     h1 { font-size: clamp(34px, 9vw, 44px); }
   }
 </style>
+<script>document.documentElement.classList.add('js');</script>
 </head>
 <body>
+<a class="skip" href="#top">跳到主要内容</a>
 <div class="bg" aria-hidden="true"></div>
 
 <header class="top">
@@ -451,7 +464,7 @@
         </p>
         <div class="hero-act">
           <a class="btn btn-primary" href="https://github.com/ITxuezhe/kuxi/releases/latest" target="_blank" rel="noopener">
-            下载 v<span id="hero-ver">0.1.1</span>
+            下载 v<span id="hero-ver">0.2.0</span>
             <span aria-hidden="true" style="font-family:var(--mono);font-size:12px;opacity:.7">桌面版</span>
           </a>
           <a class="btn" href="#entries">先看看能做什么</a>
@@ -676,34 +689,34 @@
       <div class="dl-panel reveal">
         <div class="dl-top">
           <div>
-            <h3>库犀 v<span id="dl-ver">0.1.1</span></h3>
+            <h3>库犀 v<span id="dl-ver">0.2.0</span></h3>
             <div class="ver" id="dl-meta" style="margin-top:6px">最新公开版本 · 2026-10-30</div>
           </div>
           <a class="btn btn-sm" href="https://github.com/ITxuezhe/kuxi/releases" target="_blank" rel="noopener">查看全部版本 →</a>
         </div>
 
         <div class="plats">
-          <a class="plat" data-arch="arm64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.1.1/Kuxi-0.1.1-arm64.dmg">
+          <a class="plat" data-arch="arm64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.2.0/Kuxi-0.2.0-arm64.dmg">
             <span class="glyph" aria-hidden="true">✦</span>
             <span class="t">
               <b>macOS · Apple Silicon</b>
-              <span id="meta-arm64">M1 / M2 / M3 / M4 · dmg · 117 MB</span>
+              <span id="meta-arm64">M1 / M2 / M3 / M4 · dmg · 115 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
-          <a class="plat" data-arch="x64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.1.1/Kuxi-0.1.1-x64.dmg">
+          <a class="plat" data-arch="x64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.2.0/Kuxi-0.2.0-x64.dmg">
             <span class="glyph" aria-hidden="true">✦</span>
             <span class="t">
               <b>macOS · Intel</b>
-              <span id="meta-x64">x64 · dmg · 122 MB</span>
+              <span id="meta-x64">x64 · dmg · 123 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
-          <a class="plat" data-os="win" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.1.1/Kuxi-0.1.1-x64.exe">
+          <a class="plat" data-os="win" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.2.0/Kuxi-0.2.0-x64.exe">
             <span class="glyph" aria-hidden="true">▣</span>
             <span class="t">
               <b>Windows · x64</b>
-              <span id="meta-win">Windows 10 / 11 · exe · 89 MB</span>
+              <span id="meta-win">Windows 10 / 11 · exe · 86 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
@@ -717,7 +730,7 @@
 
         <div class="cmd" style="margin-top:26px">
           <span id="cmd-text">curl -fsSL https://raw.githubusercontent.com/ITxuezhe/kuxi/master/scripts/install-mac.sh | bash</span>
-          <button type="button" id="copy-btn">复制</button>
+          <button type="button" id="copy-btn" aria-live="polite">复制</button>
         </div>
         <p style="margin-top:12px;font-size:13px;color:var(--muted-2)">
           <b>macOS 推荐用法</b>：在「终端」里粘贴上面这条命令。它会自动识别芯片、下载对应安装包、校验 SHA256、装进「应用程序」并去掉隔离标记，
@@ -753,7 +766,7 @@
         </details>
         <details>
           <summary>支持哪些数据库？</summary>
-          <div class="ans">v0.1.1 支持 SQLite、MySQL、PostgreSQL。先把这三个做深，后续按需求扩展。计划中的有 SQL Server、MariaDB、ClickHouse。</div>
+          <div class="ans">v0.2.0 支持 SQLite、MySQL、PostgreSQL。先把这三个做深，后续按需求扩展。计划中的有 SQL Server、MariaDB、ClickHouse。</div>
         </details>
         <details>
           <summary>必须自己准备 AI Key 吗？</summary>
@@ -798,16 +811,21 @@
 </footer>
 
 <script>
-  // 1) 滚动入场
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  // 1) 滚动入场（不支持 IntersectionObserver 的浏览器直接显示全部内容）
+  const reveals = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 });
+    reveals.forEach((el, i) => {
+      el.style.transitionDelay = (Math.min(i, 5) * 60) + 'ms';
+      io.observe(el);
     });
-  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 });
-  document.querySelectorAll('.reveal').forEach((el, i) => {
-    el.style.transitionDelay = (Math.min(i, 5) * 60) + 'ms';
-    io.observe(el);
-  });
+  } else {
+    reveals.forEach((el) => el.classList.add('in'));
+  }
 
   // 2) 按平台高亮对应安装包：Windows 标 exe，Mac 按芯片标 Apple Silicon / Intel
   (function () {
@@ -851,7 +869,7 @@
   });
 
   // 4) 版本号与下载地址：优先读 GitHub Releases API（发布新版页面自动跟上）
-  //    页面内置的 v0.1.1 文案与直链是兜底：API 限流（未登录 60 次/小时/IP）或断网时照常可用
+  //    页面内置的 v0.2.0 文案与直链是兜底：API 限流（未登录 60 次/小时/IP）或断网时照常可用
   (function () {
     const API = 'https://api.github.com/repos/ITxuezhe/kuxi/releases/latest';
     const CACHE_KEY = 'kuxi:latest-release';

@@ -14,7 +14,7 @@
  * App 的 ConfirmDialog / InfoDialog，避免 store 直接依赖 UI 弹窗。
  */
 import { computed, ref, type Ref } from 'vue';
-import type { DbType, QueryResult, SqlAnalysis } from '@kuxi/shared';
+import type { DbType, PipelineDoc, QueryResult, SqlAnalysis } from '@kuxi/shared';
 import {
   applyPagingToSql,
   applySortToSql,
@@ -27,7 +27,7 @@ import { buildSchemaText, dialectOf, explainSql, fixSql, optimizeSql } from '../
 import { formatSql } from '../utils/sql';
 import { useToast } from '../composables/useToast';
 
-export type TabKind = 'query' | 'data' | 'design';
+export type TabKind = 'query' | 'data' | 'design' | 'pipeline';
 
 export interface WorkbenchTab {
   id: string;
@@ -45,6 +45,8 @@ export interface WorkbenchTab {
   pageOffset: number;
   /** design：要设计的表名（undefined = 新建表） */
   designTable?: string;
+  /** pipeline：管线文档（单一事实源：步骤编辑/重排直接写本对象，禁止局部拷贝回写） */
+  pipeline?: PipelineDoc;
   /** 运行时状态（每个标签独立） */
   result: QueryResult | null;
   error: string;
@@ -233,6 +235,7 @@ export function useWorkbench() {
     }
     if (t.kind === 'query') void run(t, sqlOverride ?? t.sql);
     else if (t.kind === 'data') void run(t, t.gridSql);
+    else if (t.kind === 'pipeline') toast.info('管线标签内请先「获取源数据」，再在步骤区点「运行管线」');
     else toast.info('当前是「设计表」标签页，没有可执行语句');
   }
 
@@ -310,6 +313,30 @@ export function useWorkbench() {
   /** 连接就绪后保底开一个查询标签，避免主区空白 */
   function ensureQueryTab(): void {
     if (!tabs.value.some((t) => t.kind === 'query')) openQuery();
+  }
+
+  /** 管线标签自动编号：管线 → 管线 2 → 管线 3 */
+  function nextPipelineTitle(): string {
+    const used = new Set(tabs.value.filter((t) => t.kind === 'pipeline').map((t) => t.title));
+    if (!used.has('管线')) return '管线';
+    let n = 2;
+    while (used.has(`管线 ${n}`)) n += 1;
+    return `管线 ${n}`;
+  }
+
+  /**
+   * 打开管线标签。doc 传入时深拷贝为初始内容（加载已保存管线）；
+   * 不传则给空白文档。返回响应式代理，tab.pipeline 是单一事实源。
+   */
+  function openPipeline(doc?: PipelineDoc): WorkbenchTab {
+    const tab = makeTab({
+      kind: 'pipeline',
+      title: nextPipelineTitle(),
+      pipeline: doc ? (JSON.parse(JSON.stringify(doc)) as PipelineDoc) : undefined,
+    });
+    tabs.value.push(tab);
+    activeId.value = tab.id;
+    return tabs.value.find((t) => t.id === tab.id) ?? tab;
   }
 
   function openData(table: string, pkColumns: string[]): WorkbenchTab {
@@ -651,6 +678,7 @@ export function useWorkbench() {
     ensureQueryTab,
     openData,
     openDesign,
+    openPipeline,
     applyToActiveQuery,
     select,
     close,

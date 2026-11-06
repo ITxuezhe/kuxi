@@ -1,0 +1,22 @@
+{
+  "name": "@kuxi/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "description": "库犀 MCP server：把 @kuxi/core 以标准 MCP 工具暴露给 Claude Code / Cursor 等 AI 客户端（stdio）",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "test": "tsx src/test/tools.ts"
+  },
+  "dependencies": {
+    "@kuxi/core": "workspace:*",
+    "@kuxi/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

@@ -19,7 +19,7 @@
     "typescript": "^5.6.3"
   },
   "scripts": {
-    "test": "tsx src/test/smoke.ts",
+    "test": "tsx src/test/smoke.ts && tsx src/test/pipeline.ts && tsx src/test/script-node.ts && tsx src/test/host.ts",
     "harness": "tsx src/test/harness-demo.ts"
   }
 }

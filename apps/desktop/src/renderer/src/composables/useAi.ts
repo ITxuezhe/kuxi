@@ -156,6 +156,113 @@ export function extractSql(content: string): string {
 }
 
 /**
+ * 组装"AI 生成管线配置"的 system 提示词。
+ *
+ * 只暴露非写回节点（sink 需要连接 id/表名，AI 无从得知，让用户自己加）；
+ * 节点带字段 schema（key/type/可选值），列名给当前结果的真实列，
+ * 限制步数防 maxTokens 截断。
+ *
+ * @param columns 当前源数据的列名
+ * @param nodes 可用管线节点清单（来自 pipe:nodes）
+ * @param requirement 用户的自然语言清洗需求
+ */
+export function buildPipelinePrompt(
+  columns: string[],
+  nodes: { id: string; name: string; description?: string; fields: { key: string; label: string; type: string; options?: { value: unknown; label: string }[] }[]; sink?: boolean }[],
+  requirement: string,
+): string {
+  const catalog = nodes
+    .filter((n) => !n.sink)
+    .map((n) => {
+      const fields = n.fields.length
+        ? n.fields
+            .map((f) => {
+              const opts = f.options ? `，可选值：${f.options.map((o) => JSON.stringify(o.value)).join('/')}` : '';
+              return `    - ${f.key}（${f.label}，类型 ${f.type}${opts}）`;
+            })
+            .join('\n')
+        : '    （无参数）';
+      return `- ${n.id}「${n.name}」${n.description ? `：${n.description}` : ''}\n${fields}`;
+    })
+    .join('\n');
+  return [
+    '你是数据清洗管线的配置助手。管线按顺序对表格数据应用一系列转换节点。',
+    '只输出 JSON，不要解释文字。格式为：{"steps":[{"node":"节点id","options":{"字段key":值}}]}',
+    '规则：',
+    '1. node 只能使用下面列出的节点 id；options 只能使用对应节点的字段 key。',
+    `2. 涉及列名的值必须来自当前数据的列：${columns.join('、') || '（未知）'}。`,
+    '3. 最多 5 步；select 字段的值必须是其可选值之一；数字字段给数字。',
+    '4. 不要包含写回数据库类节点。',
+    '',
+    '可用节点：',
+    catalog,
+    '',
+    '用户需求：',
+    requirement,
+  ].join('\n');
+}
+
+/**
+ * 从模型回复中提取并校验管线步骤。
+ *
+ * 容错：剥 ```json 围栏 → 截取第一个 { 或 [ → JSON.parse；
+ * 过滤非法节点 id、非法 options key、非原始值。
+ * 解析失败返回 null（调用方提示用户重试）。
+ *
+ * @param content 模型回复原文
+ * @param nodes 可用节点清单（校验依据）
+ */
+export function extractPipelineSteps(
+  content: string,
+  nodes: { id: string; fields: { key: string }[] }[],
+): { id: string; node: string; options: Record<string, unknown> }[] | null {
+  const fenced = /```(?:json)?\s*\n?([\s\S]*?)```/i.exec(content);
+  const body = (fenced?.[1] ?? content).trim();
+  const start = body.search(/[[{]/);
+  if (start < 0) return null;
+  let parsed: unknown = null;
+  // 先整段解析；失败则截到最后一个闭合括号（模型爱在 JSON 后追加解释文字）
+  const candidates = [body.slice(start)];
+  const lastClose = Math.max(body.lastIndexOf(']'), body.lastIndexOf('}'));
+  if (lastClose > start) candidates.push(body.slice(start, lastClose + 1));
+  for (const c of candidates) {
+    try {
+      parsed = JSON.parse(c);
+      break;
+    } catch {
+      /* 继续尝试下一候选 */
+    }
+  }
+  if (parsed === null) return null;
+  const rawSteps = Array.isArray(parsed)
+    ? parsed
+    : parsed && Array.isArray((parsed as { steps?: unknown[] }).steps)
+      ? (parsed as { steps: unknown[] }).steps
+      : null;
+  if (!rawSteps) return null;
+
+  const byId = new Map(nodes.map((n) => [n.id, new Set(n.fields.map((f) => f.key))]));
+  const steps: { id: string; node: string; options: Record<string, unknown> }[] = [];
+  for (const s of rawSteps) {
+    if (!s || typeof s !== 'object') continue;
+    const node = (s as { node?: unknown }).node;
+    if (typeof node !== 'string' || !byId.has(node)) continue;
+    const allowedKeys = byId.get(node)!;
+    const options: Record<string, unknown> = {};
+    const rawOpts = (s as { options?: unknown }).options;
+    if (rawOpts && typeof rawOpts === 'object') {
+      for (const [k, v] of Object.entries(rawOpts as Record<string, unknown>)) {
+        if (!allowedKeys.has(k)) continue;
+        if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) options[k] = v;
+        else if (Array.isArray(v)) options[k] = v.filter((x) => ['string', 'number'].includes(typeof x));
+      }
+    }
+    steps.push({ id: `ai${steps.length + 1}`, node, options });
+  }
+  return steps;
+}
+
+/**
  * 调用 AI 生成 SQL 消息（返回原始回复，提取交给调用方）。
  *
  * @param system system 提示词（含规则与 schema）

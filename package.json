@@ -14,8 +14,15 @@
     "checksums": "node scripts/gen-checksums.mjs",
     "test:core": "pnpm --filter @kuxi/core test",
     "test:desktop": "pnpm --filter @kuxi/desktop test",
+    "test:mcp": "pnpm --filter @kuxi/mcp test",
+    "test:daemon": "pnpm --filter @kuxi/daemon test",
+    "test:vscode": "pnpm --filter kuxi-vscode test",
+    "test:hosts": "pnpm --filter @kuxi/mcp test && pnpm --filter @kuxi/daemon test && pnpm --filter kuxi-vscode test",
+    "mcp": "pnpm --filter @kuxi/mcp start",
+    "daemon": "pnpm --filter @kuxi/daemon start",
+    "vscode:build": "pnpm --filter kuxi-vscode build",
     "harness": "pnpm --filter @kuxi/core harness",
-    "typecheck": "pnpm --filter @kuxi/core exec tsc -p ../shared/tsconfig.json --noEmit && pnpm --filter @kuxi/core exec tsc -p tsconfig.json --noEmit"
+    "typecheck": "pnpm --filter @kuxi/core exec tsc -p ../shared/tsconfig.json --noEmit && pnpm --filter @kuxi/core exec tsc -p tsconfig.json --noEmit && pnpm --filter @kuxi/mcp exec tsc -p tsconfig.json && pnpm --filter @kuxi/daemon exec tsc -p tsconfig.json && pnpm --filter kuxi-vscode exec tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "^22.10.2"

@@ -423,8 +423,8 @@ function toPreview(importId: string, dataset: CachedDataset): ImportDatasetPrevi
   };
 }
 
-/** 标识符引用：MySQL 反引号，其余双引号 */
-function quoteIdent(dbType: DbType, name: string): string {
+/** 标识符引用：MySQL 反引号，其余双引号（pipeline.ts 写回节点复用） */
+export function quoteIdent(dbType: DbType, name: string): string {
   if (dbType === 'mysql') return `\`${name.replace(/`/g, '``')}\``;
   return `"${name.replace(/"/g, '""')}"`;
 }

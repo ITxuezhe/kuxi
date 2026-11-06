@@ -61,4 +61,37 @@ describe('ResultChart', () => {
     });
     expect(wrapper.find('.rchart-empty').text()).toContain('计数');
   });
+
+  it('preset 优先于默认启发式：按管线配置选列与汇总', () => {
+    const wrapper = mount(ResultChart, {
+      props: {
+        result: RESULT,
+        preset: { type: 'bar', category: 'city', value: 'amount', agg: 'max' },
+      },
+    });
+    // 默认启发式是 sum；preset 指定 max → note 反映 preset
+    expect(wrapper.find('.rchart-note').text()).toContain('最大值 amount');
+  });
+
+  it('preset 列不存在时回退启发式默认', () => {
+    const wrapper = mount(ResultChart, {
+      props: {
+        result: RESULT,
+        preset: { type: 'bar', category: 'nope', value: 'amount', agg: 'max' },
+      },
+    });
+    // 回退：分类取首个非数值列 city、汇总取默认 sum
+    expect(wrapper.find('.rchart-note').text()).toContain('按「city」分类');
+    expect(wrapper.find('.rchart-note').text()).toContain('求和 amount');
+  });
+
+  it('用户调整配置时 emit change', async () => {
+    const wrapper = mount(ResultChart, { props: { result: RESULT } });
+    const selects = wrapper.findAll('.rchart-controls select');
+    void selects[0]!.setValue('pie');
+    await wrapper.vm.$nextTick();
+    const events = wrapper.emitted('change');
+    expect(events?.length).toBeGreaterThan(0);
+    expect((events?.at(-1)?.[0] as { type: string }).type).toBe('pie');
+  });
 });

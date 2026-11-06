@@ -3430,6 +3430,9 @@ button.danger:hover:not(:disabled) {
 .tab-kind.kind-design {
   background: var(--warn);
 }
+.tab-kind.kind-pipeline {
+  background: var(--pipeline);
+}
 /* 未选中的徽章压暗一档：选中标签的彩色才会跳出来当"当前位置"的锚点 */
 .tab:not(.active) .tab-kind {
   opacity: 0.6;

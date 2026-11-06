@@ -21,12 +21,12 @@ const { ready: aiReady } = useAi();
       :ai-ready="aiReady"
       :error-text="tab.error ?? ''"
       @execute="() => wb.run(tab, tab.sql)"
-      @execute-selection="(text: string) => wb.run(tab, text)"
-      @format="(p: { text: string; start: number; end: number }) => wb.format(tab, p)"
-      @optimize="(p: { text: string; start: number; end: number }) => wb.optimize(tab, p)"
-      @explain="(text: string) => wb.explain(text)"
-      @explain-plan="(text: string) => wb.explainPlan(tab, text)"
-      @fix="(p: { text: string; start: number; end: number; error: string }) => wb.fix(tab, p)"
+      @execute-selection="(text) => wb.run(tab, text)"
+      @format="(p) => wb.format(tab, p)"
+      @optimize="(p) => wb.optimize(tab, p)"
+      @explain="(text) => wb.explain(text)"
+      @explain-plan="(text) => wb.explainPlan(tab, text)"
+      @fix="(p) => wb.fix(tab, p)"
     />
     <ResultTable
       :result="tab.result"

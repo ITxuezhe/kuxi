@@ -344,6 +344,22 @@ export const IPC = {
   ImportRun: 'import:run',
   /** 主进程 → 渲染进程：导入进度 */
   ImportProgress: 'import:progress',
+  /** 数据管线：可用节点清单（transformer 插件 + 配置字段 schema） */
+  PipelineNodes: 'pipe:nodes',
+  /** 数据管线：已保存管线列表 */
+  PipelineList: 'pipe:list',
+  /** 数据管线：新建/覆盖保存（返回更新后的完整列表） */
+  PipelineUpsert: 'pipe:upsert',
+  /** 数据管线：删除（返回更新后的完整列表） */
+  PipelineDelete: 'pipe:delete',
+  /** 数据管线：对行数据依序应用步骤（rows 过 IPC，主进程 harness 执行） */
+  PipelineRun: 'pipe:run',
+  /** 插件系统：已挂载插件清单（内置 + 用户目录） */
+  PluginList: 'plugin:list',
+  /** 插件系统：重新加载 userData/plugins/*.js（返回更新后的清单） */
+  PluginReload: 'plugin:reload',
+  /** 插件系统：在系统文件管理器中打开插件目录 */
+  PluginOpenDir: 'plugin:open-dir',
 } as const;
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];
@@ -718,4 +734,126 @@ export type ImportOutcome =
       /** 失败时是否已回滚（批次插入在事务中执行） */
       rolledBack: boolean;
     };
+
+// ============================================================================
+// 数据管线（P3：可扩展管线引擎 + L1 节点库 + Applied Steps 保存/重放）
+// 约定：类型全部放 shared（渲染进程只允许 import shared）；
+// core 的 TransformerCapability.fields 从这里 import NodeFieldSpec。
+// ============================================================================
+
+/**
+ * 图表预设（chart 节点的 options 与 ResultChart 的 preset prop 共用此形状）。
+ * 与 ResultChart 实际能力对齐：单分类列 + 单数值列 + 汇总方式。
+ */
+export interface ChartPreset {
+  type: 'bar' | 'line' | 'pie';
+  /** 分类列（X 轴 / 饼图扇区） */
+  category: string;
+  /** 数值列（Y 轴 / 饼图权重） */
+  value: string;
+  /** 汇总方式 */
+  agg: 'sum' | 'avg' | 'count' | 'max' | 'min';
+}
+
+/**
+ * 节点配置字段 schema（供 UI 渲染通用表单）。
+ * optionsFrom 让下拉选项动态取自"该步输入的列"，而非写死：
+ * dedupe/fill-null/type-cast 的字段选择必须来自当前结果列。
+ */
+export interface NodeFieldSpec {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'multiselect' | 'code';
+  /** 静态选项（如 chart 的 type/agg） */
+  options?: { value: string | number; label: string }[];
+  /** 动态选项来源：columns=该步输入列；connections/tables=维护节点选目标库表 */
+  optionsFrom?: 'columns' | 'numericColumns' | 'connections' | 'tables';
+  placeholder?: string;
+  default?: string | number;
+  /** 表单里的辅助说明（如"图表会按分类再汇总一次"） */
+  hint?: string;
+}
+
+/** 管线中的一步：引用某 transformer 插件 id + 该步选项 */
+export interface PipelineStep {
+  id: string;
+  /** 完整插件 id，如 transformer.dedupe */
+  node: string;
+  options: Record<string, unknown>;
+}
+
+/** 一条可保存/重放的管线文档（落 pipelines.json） */
+export interface PipelineDoc {
+  id: string;
+  name: string;
+  description?: string;
+  /** 结构版本，便于后续迁移 */
+  version: number;
+  steps: PipelineStep[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 节点清单项（pipe:nodes 返回：manifest + 字段 schema） */
+export interface PipelineNodeInfo {
+  id: string;
+  name: string;
+  description?: string;
+  fields: NodeFieldSpec[];
+  /** 维护节点标记：主进程在管线跑完后把结果写回数据库 */
+  sink?: boolean;
+}
+
+/** 单步执行轨迹（含每步输出列，便于观察形状变化） */
+export interface StepTrace {
+  stepId: string;
+  node: string;
+  inRows: number;
+  outRows: number;
+  ms: number;
+  /** 该步输出的列（形状变化后可见） */
+  outColumns?: string[];
+  error?: string;
+}
+
+/** 管线运行请求（本批次 rows 为唯一数据源；datasetId 为后续扩展位） */
+export interface PipelineRunRequest {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  steps: PipelineStep[];
+  /** 预留：主进程缓存数据集后按引用传递 */
+  datasetId?: string;
+}
+
+/** 维护节点写回模式：追加 / 清空重灌（危险，UI 二次确认） */
+export type SinkWriteMode = 'append' | 'overwrite';
+
+/** 写回执行摘要（sink 步骤成功后附在信封里） */
+export interface SinkWriteResult {
+  rows: number;
+  table: string;
+  mode: SinkWriteMode;
+}
+
+/** 管线运行结果信封（业务失败走信封，error 也带 trace 以定位失败步） */
+export type PipelineRunOutcome =
+  | { status: 'ok'; result: QueryResult; trace: StepTrace[]; sink?: SinkWriteResult }
+  | { status: 'error'; message: string; trace: StepTrace[] };
+
+/**
+ * 插件清单项（plugin:list 返回：内置 + 用户目录加载）。
+ * type 用字符串而非联合：PluginType 定义在 @kuxi/core，shared 不反向依赖 core。
+ */
+export interface PluginInfo {
+  id: string;
+  name: string;
+  type: string;
+  version: string;
+  description?: string;
+  /** builtin：内置注册；user：userData/plugins/*.js 加载 */
+  source: 'builtin' | 'user';
+  /** 加载/挂载失败的原因（成功时 undefined；失败的插件不会出现在能力表中） */
+  error?: string;
+}
+
 

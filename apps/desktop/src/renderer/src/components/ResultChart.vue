@@ -7,14 +7,19 @@
  * 不新增依赖：图形用内联 SVG，天然跟随主题色，打包体积零增长。
  */
 import { computed, ref, watch } from 'vue';
-import type { QueryResult } from '@kuxi/shared';
+import type { ChartPreset, QueryResult } from '@kuxi/shared';
 import { isNumericType } from '../utils/queryBuilder';
 
 const props = defineProps<{
   result: QueryResult;
   /** 列类型标注（来自 schema）；没有时按样本值推断 */
   columnTypes?: Record<string, string>;
+  /** 外部预设（管线 chart 节点配置）：列存在时优先于默认启发式 */
+  preset?: ChartPreset;
 }>();
+
+/** 用户调整图表配置时上抛（管线标签据此写回步骤 options） */
+const emit = defineEmits<{ change: [ChartPreset] }>();
 
 type ChartType = 'bar' | 'line' | 'pie';
 type Agg = 'sum' | 'avg' | 'count' | 'max' | 'min';
@@ -53,15 +58,33 @@ function columnIsNumeric(name: string): boolean {
 
 const numericColumns = computed<string[]>(() => props.result.columns.filter(columnIsNumeric));
 
-/** 结果变化（换了一次查询）时重置默认字段，避免沿用上一份结果的选择 */
+/** 结果变化（换了一次查询）时重置默认字段，避免沿用上一份结果的选择；preset 优先 */
 watch(
   () => props.result,
   (result) => {
+    const p = props.preset;
+    if (p && result.columns.includes(p.category) && (!p.value || result.columns.includes(p.value))) {
+      chartType.value = p.type;
+      category.value = p.category;
+      value.value = p.value;
+      agg.value = p.agg;
+      return;
+    }
     category.value = result.columns.find((c) => !columnIsNumeric(c)) ?? result.columns[0] ?? '';
     value.value = numericColumns.value[0] ?? '';
   },
   { immediate: true },
 );
+
+/** 任一配置变化都上抛（含 preset 应用后的初始状态，父级写回同值无害） */
+watch([chartType, category, value, agg], () => {
+  emit('change', {
+    type: chartType.value,
+    category: category.value,
+    value: value.value,
+    agg: agg.value,
+  });
+});
 
 /** 转数值；空串/非数字返回 NaN（聚合时忽略） */
 function toNumber(input: unknown): number {
@@ -272,9 +295,10 @@ function fmt(n: number): string {
       role="img"
       :aria-label="`按 ${category} 统计 ${agg === 'count' ? '行数' : value} 的饼图`"
     >
-      <template v-for="s in slices" :key="s.label">
+      <template v-for="s in slices">
         <circle
           v-if="s.full"
+          :key="`pie-${s.label}`"
           :cx="PIE.cx"
           :cy="PIE.cy"
           :r="PIE.r"
@@ -283,7 +307,7 @@ function fmt(n: number): string {
         >
           <title>{{ s.label }}：{{ fmt(s.value) }}（100%）</title>
         </circle>
-        <path v-else :d="s.path" :fill="s.color" :opacity="0.92">
+        <path v-else :key="`pie-${s.label}`" :d="s.path" :fill="s.color" :opacity="0.92">
           <title>{{ s.label }}：{{ fmt(s.value) }}（{{ Math.round(s.percent * 100) }}%）</title>
         </path>
       </template>

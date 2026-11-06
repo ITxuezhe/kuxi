@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AiMessage } from '@kuxi/shared';
-import { askAi, extractSql } from './useAi';
+import { askAi, buildPipelinePrompt, extractPipelineSteps, extractSql } from './useAi';
 
 /**
  * AI 调用层回归测试。
@@ -65,5 +65,66 @@ describe('extractSql', () => {
 
   it('无围栏时从首个 SQL 行截取', () => {
     expect(extractSql('先看看\nSELECT * FROM t')).toBe('SELECT * FROM t');
+  });
+});
+
+describe('extractPipelineSteps', () => {
+  const nodes = [
+    { id: 'transformer.dedupe', fields: [{ key: 'field' }] },
+    { id: 'transformer.limit', fields: [{ key: 'n' }] },
+  ];
+
+  it('剥 ```json 围栏 + steps 包裹形态', () => {
+    const out = extractPipelineSteps(
+      '好的：\n```json\n{"steps":[{"node":"transformer.dedupe","options":{"field":"city"}},{"node":"transformer.limit","options":{"n":10}}]}\n```',
+      nodes,
+    );
+    expect(out).toEqual([
+      { id: 'ai1', node: 'transformer.dedupe', options: { field: 'city' } },
+      { id: 'ai2', node: 'transformer.limit', options: { n: 10 } },
+    ]);
+  });
+
+  it('裸数组形态 + 散文前缀', () => {
+    const out = extractPipelineSteps('建议如下 [{"node":"transformer.limit","options":{"n":5}}] 供参考', nodes);
+    expect(out).toEqual([{ id: 'ai1', node: 'transformer.limit', options: { n: 5 } }]);
+  });
+
+  it('过滤非法节点 id 与非法 options key', () => {
+    const out = extractPipelineSteps(
+      '[{"node":"transformer.hack","options":{}},{"node":"transformer.dedupe","options":{"field":"a","evil":"x"}}]',
+      nodes,
+    );
+    expect(out).toEqual([{ id: 'ai1', node: 'transformer.dedupe', options: { field: 'a' } }]);
+  });
+
+  it('非法 JSON / 无 JSON → null', () => {
+    expect(extractPipelineSteps('我建议你用去重节点', nodes)).toBeNull();
+    expect(extractPipelineSteps('{"steps": 坏掉的', nodes)).toBeNull();
+  });
+
+  it('数组值只保留原始类型元素', () => {
+    const out = extractPipelineSteps(
+      '[{"node":"transformer.dedupe","options":{"field":["a",{"bad":1},"b"]}}]',
+      nodes,
+    );
+    expect(out?.[0].options.field).toEqual(['a', 'b']);
+  });
+});
+
+describe('buildPipelinePrompt', () => {
+  it('目录不含写回节点、带上列名与需求', () => {
+    const sys = buildPipelinePrompt(
+      ['city', 'amount'],
+      [
+        { id: 'transformer.dedupe', name: '去重', fields: [{ key: 'field', label: '列', type: 'select' }], sink: false },
+        { id: 'transformer.db-write', name: '写回', fields: [], sink: true },
+      ],
+      '按城市去重',
+    );
+    expect(sys).toContain('transformer.dedupe');
+    expect(sys).not.toContain('transformer.db-write');
+    expect(sys).toContain('city、amount');
+    expect(sys).toContain('按城市去重');
   });
 });

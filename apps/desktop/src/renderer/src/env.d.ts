@@ -21,6 +21,11 @@ import type {
   ImportProgress,
   ImportReparseRequest,
   ImportRunRequest,
+  PipelineDoc,
+  PipelineNodeInfo,
+  PipelineRunOutcome,
+  PluginInfo,
+  PipelineRunRequest,
   QueryResult,
   UpdateStatus,
 } from '@kuxi/shared';
@@ -115,6 +120,19 @@ declare global {
       importRun(req: ImportRunRequest): Promise<ImportOutcome>;
       /** 订阅主进程推送的导入进度；返回取消订阅函数 */
       onImportProgress(cb: (progress: ImportProgress) => void): () => void;
+
+      // ---- 数据管线 ----
+      pipelineNodes(): Promise<PipelineNodeInfo[]>;
+      pipelineList(): Promise<PipelineDoc[]>;
+      pipelineUpsert(doc: PipelineDoc): Promise<PipelineDoc[]>;
+      pipelineDelete(id: string): Promise<PipelineDoc[]>;
+      pipelineRun(req: PipelineRunRequest): Promise<PipelineRunOutcome>;
+
+      // ---- 插件系统 ----
+      pluginList(): Promise<PluginInfo[]>;
+      /** 重新加载 userData/plugins/*.js，返回更新后的完整清单 */
+      pluginReload(): Promise<PluginInfo[]>;
+      pluginOpenDir(): Promise<{ ok: boolean; message?: string }>;
 
       // ---- 自动更新 ----
       checkUpdates(): Promise<UpdateStatus>;

@@ -1,0 +1,36 @@
+{
+  "name": "kuxi-vscode",
+  "displayName": "库犀 Kuxi（原型）",
+  "description": "VSCode 外壳原型：复用 @kuxi/core headless 引擎，连 SQLite 跑只读查询与管线（P5 平台化验证）",
+  "version": "0.0.0",
+  "private": true,
+  "publisher": "kuxi",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "kuxi.connectSqlite", "title": "库犀: 连接 SQLite" },
+      { "command": "kuxi.listTables", "title": "库犀: 列出表" },
+      { "command": "kuxi.runReadonlyQuery", "title": "库犀: 执行只读查询" },
+      { "command": "kuxi.runPipeline", "title": "库犀: 查询结果跑管线（按列去重）" },
+      { "command": "kuxi.disconnect", "title": "库犀: 断开连接" }
+    ]
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --external:cpu-features --outfile=dist/extension.js",
+    "test": "tsx src/test/logic.ts"
+  },
+  "devDependencies": {
+    "@kuxi/core": "workspace:*",
+    "@kuxi/shared": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.96.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
