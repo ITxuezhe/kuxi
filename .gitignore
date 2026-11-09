@@ -32,6 +32,7 @@ _tmp_*
 .vscode/*
 !.vscode/extensions.json
 .workbuddy/
+.trae/
 
 # ---- 内部文档：仅本地与私有仓库 kuxi-notes 保留，不随开源仓库发布 ----
 商业模式-成本与收费点分析.md
