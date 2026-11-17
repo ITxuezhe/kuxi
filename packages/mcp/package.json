@@ -1,8 +1,8 @@
 {
   "name": "kuxi-mcp",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "type": "module",
-  "description": "库犀（KuXi）MCP server — 让 Claude / Cursor 等 AI 客户端直接查询 SQLite / MySQL / PostgreSQL，看表结构、跑只读 SQL 与数据清洗管线",
+  "description": "库犀（KuXi）MCP server — 让 Claude / Cursor 等 AI 客户端直接查询 SQLite / MySQL / PostgreSQL，看表结构、跑只读 SQL 与数据清洗管线。单包安装，npx kuxi-mcp 一行接入",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -36,12 +36,16 @@
     "test": "tsx src/test/tools.ts && tsx src/test/e2e.ts"
   },
   "dependencies": {
-    "kuxi-core": "workspace:*",
-    "kuxi-shared": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "mysql2": "^3.11.3",
+    "pg": "^8.13.1",
+    "pg-cursor": "^2.22.1",
+    "ssh2": "^1.17.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "kuxi-core": "workspace:*",
+    "kuxi-shared": "workspace:*",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"

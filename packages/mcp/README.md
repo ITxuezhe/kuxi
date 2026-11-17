@@ -38,10 +38,9 @@
 - `run_pipeline` 不含写回节点
 - 连接参数只在当次对话的 `connect` 调用中出现，密码不落盘
 
-## 相关包
+## 相关
 
-- [kuxi-core](https://www.npmjs.com/package/kuxi-core)：无头数据库引擎（本包的内核）
-- [kuxi-shared](https://www.npmjs.com/package/kuxi-shared)：跨包共享类型契约
+本包是**单包安装**：库犀的 core 引擎已打进 bundle，无需额外安装其他包。
 
 桌面版（连接管理 / SQL 编辑器 / 表设计器 / 可视化管线）见 [Releases](https://github.com/ITxuezhe/kuxi/releases)。
 
