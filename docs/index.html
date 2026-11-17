@@ -464,7 +464,7 @@
         </p>
         <div class="hero-act">
           <a class="btn btn-primary" href="https://github.com/ITxuezhe/kuxi/releases/latest" target="_blank" rel="noopener">
-            下载 v<span id="hero-ver">0.2.0</span>
+            下载 v<span id="hero-ver">0.3.0</span>
             <span aria-hidden="true" style="font-family:var(--mono);font-size:12px;opacity:.7">桌面版</span>
           </a>
           <a class="btn" href="#entries">先看看能做什么</a>
@@ -689,34 +689,34 @@
       <div class="dl-panel reveal">
         <div class="dl-top">
           <div>
-            <h3>库犀 v<span id="dl-ver">0.2.0</span></h3>
-            <div class="ver" id="dl-meta" style="margin-top:6px">最新公开版本 · 2026-10-30</div>
+            <h3>库犀 v<span id="dl-ver">0.3.0</span></h3>
+            <div class="ver" id="dl-meta" style="margin-top:6px">最新公开版本 · 2026-11-17</div>
           </div>
           <a class="btn btn-sm" href="https://github.com/ITxuezhe/kuxi/releases" target="_blank" rel="noopener">查看全部版本 →</a>
         </div>
 
         <div class="plats">
-          <a class="plat" data-arch="arm64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.2.0/Kuxi-0.2.0-arm64.dmg">
+          <a class="plat" data-arch="arm64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.3.0/Kuxi-0.3.0-arm64.dmg">
             <span class="glyph" aria-hidden="true">✦</span>
             <span class="t">
               <b>macOS · Apple Silicon</b>
-              <span id="meta-arm64">M1 / M2 / M3 / M4 · dmg · 115 MB</span>
+              <span id="meta-arm64">M1 / M2 / M3 / M4 · dmg · 121 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
-          <a class="plat" data-arch="x64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.2.0/Kuxi-0.2.0-x64.dmg">
+          <a class="plat" data-arch="x64" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.3.0/Kuxi-0.3.0-x64.dmg">
             <span class="glyph" aria-hidden="true">✦</span>
             <span class="t">
               <b>macOS · Intel</b>
-              <span id="meta-x64">x64 · dmg · 123 MB</span>
+              <span id="meta-x64">x64 · dmg · 129 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
-          <a class="plat" data-os="win" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.2.0/Kuxi-0.2.0-x64.exe">
+          <a class="plat" data-os="win" href="https://github.com/ITxuezhe/kuxi/releases/download/v0.3.0/Kuxi-0.3.0-x64.exe">
             <span class="glyph" aria-hidden="true">▣</span>
             <span class="t">
               <b>Windows · x64</b>
-              <span id="meta-win">Windows 10 / 11 · exe · 86 MB</span>
+              <span id="meta-win">Windows 10 / 11 · exe · 91 MB</span>
             </span>
             <span class="get">下载</span>
           </a>
@@ -766,7 +766,7 @@
         </details>
         <details>
           <summary>支持哪些数据库？</summary>
-          <div class="ans">v0.2.0 支持 SQLite、MySQL、PostgreSQL。先把这三个做深，后续按需求扩展。计划中的有 SQL Server、MariaDB、ClickHouse。</div>
+          <div class="ans">目前支持 SQLite、MySQL、PostgreSQL。先把这三个做深，后续按需求扩展。计划中的有 SQL Server、MariaDB、ClickHouse。</div>
         </details>
         <details>
           <summary>必须自己准备 AI Key 吗？</summary>
@@ -869,7 +869,7 @@
   });
 
   // 4) 版本号与下载地址：优先读 GitHub Releases API（发布新版页面自动跟上）
-  //    页面内置的 v0.2.0 文案与直链是兜底：API 限流（未登录 60 次/小时/IP）或断网时照常可用
+  //    页面内置的 v0.3.0 文案与直链是兜底：API 限流（未登录 60 次/小时/IP）或断网时照常可用
   (function () {
     const API = 'https://api.github.com/repos/ITxuezhe/kuxi/releases/latest';
     const CACHE_KEY = 'kuxi:latest-release';
