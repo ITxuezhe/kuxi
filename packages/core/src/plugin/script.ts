@@ -19,7 +19,7 @@
 
 import { runInNewContext } from 'node:vm';
 import { spawnSync } from 'node:child_process';
-import type { NodeFieldSpec } from '@itxuezhe/shared';
+import type { NodeFieldSpec } from 'kuxi-shared';
 import type { TransformerCapability } from './builtin';
 
 /** 超时钳制：1~60 秒（默认 10 秒），防 UI 传非法值 */

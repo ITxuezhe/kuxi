@@ -3,7 +3,7 @@
  * 覆盖：每个内置 transformer、引擎串联、列重算、trace、未知节点、空行。
  */
 import { Harness, mountBuiltinPlugins, runPipelineSteps } from '../index';
-import type { PipelineStep } from '@itxuezhe/shared';
+import type { PipelineStep } from 'kuxi-shared';
 
 let failures = 0;
 function assert(cond: boolean, msg: string): void {

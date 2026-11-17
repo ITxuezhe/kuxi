@@ -9,7 +9,7 @@
  * - HOST_TOOLS 里的工具名 → callHostTool；ok 走 result，失败走 error（code -32000）
  * - notifications/*（无 id 的通知）不回帧
  */
-import { callHostTool, HOST_TOOLS, type KuxiHost } from '@itxuezhe/core';
+import { callHostTool, HOST_TOOLS, type KuxiHost } from 'kuxi-core';
 
 /** JSON-RPC 2.0 请求帧 */
 export interface RpcRequest {

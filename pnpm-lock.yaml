@@ -188,12 +188,6 @@ importers:
         specifier: 0.18.5
         version: 0.18.5
     devDependencies:
-      '@itxuezhe/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@itxuezhe/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@vitejs/plugin-vue':
         specifier: ^5.2.1
         version: 5.2.4(vite@5.4.21(@types/node@22.20.5))(vue@3.5.44(typescript@5.9.3))
@@ -212,6 +206,12 @@ importers:
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1(supports-color@7.2.0)
+      kuxi-core:
+        specifier: workspace:*
+        version: link:../../packages/core
+      kuxi-shared:
+        specifier: workspace:*
+        version: link:../../packages/shared
       monaco-editor:
         specifier: ^0.57.0
         version: 0.57.0
@@ -236,12 +236,6 @@ importers:
 
   apps/vscode:
     devDependencies:
-      '@itxuezhe/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@itxuezhe/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@types/node':
         specifier: ^22.10.2
         version: 22.20.5
@@ -251,6 +245,12 @@ importers:
       esbuild:
         specifier: ^0.24.0
         version: 0.24.2
+      kuxi-core:
+        specifier: workspace:*
+        version: link:../../packages/core
+      kuxi-shared:
+        specifier: workspace:*
+        version: link:../../packages/shared
       tsx:
         specifier: ^4.19.2
         version: 4.23.15
@@ -260,7 +260,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@itxuezhe/shared':
+      kuxi-shared:
         specifier: workspace:*
         version: link:../shared
       mysql2:
@@ -297,10 +297,10 @@ importers:
 
   packages/daemon:
     dependencies:
-      '@itxuezhe/core':
+      kuxi-core:
         specifier: workspace:*
         version: link:../core
-      '@itxuezhe/shared':
+      kuxi-shared:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -316,15 +316,15 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@itxuezhe/core':
-        specifier: ^0.2.2
-        version: 0.2.2(@types/node@22.20.5)
-      '@itxuezhe/shared':
-        specifier: ^0.2.2
-        version: 0.2.2
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.32.2(supports-color@7.2.0)(zod@4.6.7)
+      kuxi-core:
+        specifier: workspace:*
+        version: link:../core
+      kuxi-shared:
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: ^22.10.2
@@ -1104,13 +1104,6 @@ packages:
   '@isaacs/fs-minipass@4.0.1':
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
     engines: {node: '>=18.0.0'}
-
-  '@itxuezhe/core@0.2.2':
-    resolution: {integrity: sha512-o6sydge4Blc9Pk0TM7mF04xyhCYMITdrbRyD2EP7wXPioMsiR8fNWaVcic9CJ2XiLhTeqJX3qcJQ4NmZLrDRwQ==}
-    engines: {node: '>=22.5.0'}
-
-  '@itxuezhe/shared@0.2.2':
-    resolution: {integrity: sha512-QCrOA1LWIRpfHQalUaxI+BFxrBZj7/nEgtT4Ru2K5E84fDFcpxERCrSSNet3/xkcihPuPKNrrnXd80tZPYkM8Q==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -3974,19 +3967,6 @@ snapshots:
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
       minipass: 7.1.3
-
-  '@itxuezhe/core@0.2.2(@types/node@22.20.5)':
-    dependencies:
-      '@itxuezhe/shared': 0.2.2
-      mysql2: 3.24.6(@types/node@22.20.5)
-      pg: 8.23.1
-      pg-cursor: 2.22.1(pg@8.23.1)
-      ssh2: 1.17.0
-    transitivePeerDependencies:
-      - '@types/node'
-      - pg-native
-
-  '@itxuezhe/shared@0.2.2': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

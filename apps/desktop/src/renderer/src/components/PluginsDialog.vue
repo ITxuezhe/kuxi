@@ -8,7 +8,7 @@
  * 成功后广播 kuxi:plugins-reloaded 事件，管线标签据此刷新节点清单。
  */
 import { ref, watch } from 'vue';
-import type { PluginInfo } from '@itxuezhe/shared';
+import type { PluginInfo } from 'kuxi-shared';
 import BaseIcon from './BaseIcon.vue';
 import Modal from './Modal.vue';
 import { useToast } from '../composables/useToast';

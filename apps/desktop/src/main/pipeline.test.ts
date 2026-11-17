@@ -34,8 +34,8 @@ vi.mock('./import', () => ({
   quoteIdent: (_dbType: string, name: string) => `"${name.replace(/"/g, '""')}"`,
 }));
 
-import { IPC, type PipelineDoc, type PipelineNodeInfo, type PipelineRunOutcome } from '@itxuezhe/shared';
-import { Harness, mountBuiltinPlugins, type ConnectionManager } from '@itxuezhe/core';
+import { IPC, type PipelineDoc, type PipelineNodeInfo, type PipelineRunOutcome } from 'kuxi-shared';
+import { Harness, mountBuiltinPlugins, type ConnectionManager } from 'kuxi-core';
 import { registerPipelineIpc, MAX_PIPELINE_ROWS } from './pipeline';
 
 const harness = new Harness();

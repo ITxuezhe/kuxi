@@ -8,7 +8,7 @@
  * IPC 前对行数据 toRaw（Vue 深代理不参与结构化克隆）。
  */
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, toRaw } from 'vue';
-import type { ChartPreset, PipelineDoc, PipelineNodeInfo, PipelineRunOutcome, QueryResult, StepTrace } from '@itxuezhe/shared';
+import type { ChartPreset, PipelineDoc, PipelineNodeInfo, PipelineRunOutcome, QueryResult, StepTrace } from 'kuxi-shared';
 import { useWorkbench, type WorkbenchTab } from '../composables/useWorkbench';
 import { useToast } from '../composables/useToast';
 import ResultTable from './ResultTable.vue';

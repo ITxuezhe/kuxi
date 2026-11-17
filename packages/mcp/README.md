@@ -40,8 +40,8 @@
 
 ## 相关包
 
-- [@itxuezhe/core](https://www.npmjs.com/package/@itxuezhe/core)：无头数据库引擎（本包的内核）
-- [@itxuezhe/shared](https://www.npmjs.com/package/@itxuezhe/shared)：跨包共享类型契约
+- [kuxi-core](https://www.npmjs.com/package/kuxi-core)：无头数据库引擎（本包的内核）
+- [kuxi-shared](https://www.npmjs.com/package/kuxi-shared)：跨包共享类型契约
 
 桌面版（连接管理 / SQL 编辑器 / 表设计器 / 可视化管线）见 [Releases](https://github.com/ITxuezhe/kuxi/releases)。
 

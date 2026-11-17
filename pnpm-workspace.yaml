@@ -12,7 +12,3 @@ allowBuilds:
   ssh2: false
   # 仅 Squirrel/MSI 目标需要；本项目用 NSIS，不需要它的构建脚本
   electron-winstaller: false
-
-minimumReleaseAgeExclude:
-  - '@itxuezhe/core@0.2.2'
-  - '@itxuezhe/shared@0.2.2'

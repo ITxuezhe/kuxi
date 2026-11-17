@@ -16,7 +16,7 @@ import {
   type AiConfigInput,
   type AiMode,
   type AiProvider,
-} from '@itxuezhe/shared';
+} from 'kuxi-shared';
 import { persistAiConfig, refreshAiConfig, useAi } from '../composables/useAi';
 import BaseIcon from './BaseIcon.vue';
 import Modal from './Modal.vue';

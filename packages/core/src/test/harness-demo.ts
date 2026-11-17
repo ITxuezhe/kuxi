@@ -1,6 +1,6 @@
 /**
  * harness-demo — 可插拔内核的可执行演示
- * 运行：pnpm harness（或 pnpm --filter @itxuezhe/core harness）
+ * 运行：pnpm harness（或 pnpm --filter kuxi-core harness）
  *
  * 证明四件事：
  * 1. 「用户可自定义」的能力（AI Provider / 数据节点 / 导出 / 命令）都是插件，统一挂到内核

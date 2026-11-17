@@ -15,7 +15,7 @@
  * - 双击单元格改单格，右键复制/导出
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
-import type { DbType, ExporterInfo, QueryResult } from '@itxuezhe/shared';
+import type { DbType, ExporterInfo, QueryResult } from 'kuxi-shared';
 import { useClipboard } from '../composables/useClipboard';
 import { useToast } from '../composables/useToast';
 import { openContextMenu, type MenuItem } from '../composables/useContextMenu';

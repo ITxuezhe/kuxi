@@ -3,7 +3,7 @@
  * 覆盖：buildToolList 透传、handleToolCall 成功/失败信封、
  * 端到端：connect → 建表 → 只读查询 → run_pipeline（走真实 sqlite :memory:）。
  */
-import { createKuxiHost } from '@itxuezhe/core';
+import { createKuxiHost } from 'kuxi-core';
 import { buildToolList, handleToolCall } from '../server';
 
 let failures = 0;

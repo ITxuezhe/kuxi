@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC } from '@itxuezhe/shared';
+import { IPC } from 'kuxi-shared';
 import type {
   AiChatOutcome,
   AiConfigInput,
@@ -27,7 +27,7 @@ import type {
   PipelineRunRequest,
   PluginInfo,
   UpdateStatus,
-} from '@itxuezhe/shared';
+} from 'kuxi-shared';
 
 /**
  * 渲染进程可用 API（typed，通过 contextBridge 暴露）。

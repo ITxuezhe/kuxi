@@ -6,7 +6,7 @@
  * 3. EXPLAIN 前缀语句被 analyzeSql 归为 read（主进程 IPC 守卫的前提）
  */
 import { describe, it, expect } from 'vitest';
-import { ConnectionManager, analyzeSql } from '@itxuezhe/core';
+import { ConnectionManager, analyzeSql } from 'kuxi-core';
 
 describe('explain & maxRows', () => {
   it('EXPLAIN QUERY PLAN 以只读权限执行并返回 detail 列', async () => {

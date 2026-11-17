@@ -50,7 +50,7 @@
 **平台化（一个 core，多种外壳）**
 
 - MCP server：把库犀的 8 个能力（连库 / 列表 / 只读查询 / 跑管线等）暴露给 Claude Code、Cursor 等 AI 客户端，npm 一行接入：`npx kuxi-mcp`
-- npm 包：[kuxi-mcp](https://www.npmjs.com/package/kuxi-mcp)（入口，用户只用这个）+ 内部库 `@itxuezhe/core` / `@itxuezhe/shared`（ESM，要求 Node >= 22.5）
+- npm 包：[kuxi-mcp](https://www.npmjs.com/package/kuxi-mcp)（入口，用户只用这个）+ 内部库 `kuxi-core` / `kuxi-shared`（ESM，要求 Node >= 22.5）
 - Skill 打包：`skills/kuxi-db/`（AI 客户端可用的指令 + MCP 配置模板）
 - JSON-RPC daemon：行分隔 JSON-RPC over stdio，供 IDEA 等宿主集成
 - VSCode 扩展原型：`apps/vscode`

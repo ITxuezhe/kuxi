@@ -4,8 +4,8 @@
  * 与桌面端的关系：桌面端经 IPC 用同一 core；本外壳直接进程内调用，
  * 验证「一个 core，多种外壳」的平台化路线（P5 验收标准之一）。
  */
-import { createKuxiHost, callHostTool, type KuxiHost } from '@itxuezhe/core';
-import type { PipelineStep, QueryResult } from '@itxuezhe/shared';
+import { createKuxiHost, callHostTool, type KuxiHost } from 'kuxi-core';
+import type { PipelineStep, QueryResult } from 'kuxi-shared';
 
 /** 工具调用失败时抛出的错误（信封 ok:false 的 message） */
 export class KuxiToolError extends Error {}

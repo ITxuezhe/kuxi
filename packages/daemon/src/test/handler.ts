@@ -3,7 +3,7 @@
  * 覆盖：ping、daemon.methods、connect/list_tables/run_readonly_query 往返、
  * 写语句错误帧（-32000）、JSON 解析错误（-32700）、通知不回帧。
  */
-import { createKuxiHost } from '@itxuezhe/core';
+import { createKuxiHost } from 'kuxi-core';
 import { handleLine, handleRpc, daemonMethods } from '../handler';
 import type { RpcRequest } from '../handler';
 

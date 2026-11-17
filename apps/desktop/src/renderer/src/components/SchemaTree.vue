@@ -12,7 +12,7 @@
  * - 右键 → 打开数据 / 生成 SELECT / 复制表名 / 删除表
  */
 import { computed, ref, watch } from 'vue';
-import type { DatabaseSchema, TableInfo, ViewInfo, RoutineInfo, TriggerInfo } from '@itxuezhe/shared';
+import type { DatabaseSchema, TableInfo, ViewInfo, RoutineInfo, TriggerInfo } from 'kuxi-shared';
 import { openContextMenu } from '../composables/useContextMenu';
 import { useClipboard } from '../composables/useClipboard';
 import { useToast } from '../composables/useToast';

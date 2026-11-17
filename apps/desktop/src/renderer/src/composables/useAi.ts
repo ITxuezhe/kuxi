@@ -15,7 +15,7 @@ import type {
   AiMessage,
   DatabaseSchema,
   DbType,
-} from '@itxuezhe/shared';
+} from 'kuxi-shared';
 
 /** 数据库类型 → 提示词里使用的方言名 */
 const DIALECTS: Record<DbType, string> = {

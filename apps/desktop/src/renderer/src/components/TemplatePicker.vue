@@ -7,7 +7,7 @@
  * 危险语句（删除重复 / 更新空值）保留现有确认弹窗兜底。
  */
 import { computed } from 'vue';
-import type { DbType } from '@itxuezhe/shared';
+import type { DbType } from 'kuxi-shared';
 import BaseIcon from './BaseIcon.vue';
 
 const props = defineProps<{

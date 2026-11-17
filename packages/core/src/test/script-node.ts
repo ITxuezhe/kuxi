@@ -5,7 +5,7 @@
  */
 import { Harness, mountBuiltinPlugins, runPipelineSteps } from '../index';
 import { findPython, resetPythonProbe } from '../plugin/script';
-import type { PipelineStep } from '@itxuezhe/shared';
+import type { PipelineStep } from 'kuxi-shared';
 
 let failures = 0;
 function assert(cond: boolean, msg: string): void {

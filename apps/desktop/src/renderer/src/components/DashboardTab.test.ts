@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import type { DashboardCard } from '@itxuezhe/shared';
+import type { DashboardCard } from 'kuxi-shared';
 import DashboardTab from './DashboardTab.vue';
 
 const CARD: DashboardCard = {

@@ -1,5 +1,5 @@
 import { ConnectionManager, analyzeSql, classifySql, echo, SqliteDriver } from '../index';
-import type { IConnectionConfig } from '@itxuezhe/shared';
+import type { IConnectionConfig } from 'kuxi-shared';
 
 let failures = 0;
 function assert(cond: boolean, msg: string): void {

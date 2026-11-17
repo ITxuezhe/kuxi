@@ -7,7 +7,7 @@
  * 本组件只做展示与增删：拉列表 / 删除 / 打开源管线。
  */
 import { computed, onMounted, ref } from 'vue';
-import type { DashboardCard } from '@itxuezhe/shared';
+import type { DashboardCard } from 'kuxi-shared';
 import { useWorkbench } from '../composables/useWorkbench';
 import { useToast } from '../composables/useToast';
 import ResultChart from './ResultChart.vue';

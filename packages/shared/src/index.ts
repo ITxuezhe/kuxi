@@ -1,5 +1,5 @@
 // ============================================================================
-// @itxuezhe/shared — 跨包共享类型与常量
+// kuxi-shared — 跨包共享类型与常量
 // 此包零运行时依赖，仅类型/常量；被 core 与 desktop 共用。
 // ============================================================================
 
@@ -870,7 +870,7 @@ export interface DashboardCard {
 
 /**
  * 插件清单项（plugin:list 返回：内置 + 用户目录加载）。
- * type 用字符串而非联合：PluginType 定义在 @itxuezhe/core，shared 不反向依赖 core。
+ * type 用字符串而非联合：PluginType 定义在 kuxi-core，shared 不反向依赖 core。
  */
 export interface PluginInfo {
   id: string;

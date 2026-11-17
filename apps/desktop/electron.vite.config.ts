@@ -26,14 +26,14 @@ export default defineConfig({
     // mysql2 / pg 等真正的 npm 依赖保持 external，运行时从 node_modules 加载。
     plugins: [
       externalizeDepsPlugin({
-        exclude: ['@itxuezhe/core', '@itxuezhe/shared'],
+        exclude: ['kuxi-core', 'kuxi-shared'],
       }),
     ],
   },
   preload: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ['@itxuezhe/shared'],
+        exclude: ['kuxi-shared'],
       }),
     ],
   },

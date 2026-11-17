@@ -6,7 +6,7 @@
  * 避免可视化拼出的 SQL 在聚合场景下变成非法语句。
  */
 
-import type { DbType } from '@itxuezhe/shared';
+import type { DbType } from 'kuxi-shared';
 import { quoteIdent, quoteValue } from './sql';
 
 /** 筛选运算符 */

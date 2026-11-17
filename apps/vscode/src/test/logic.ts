@@ -5,7 +5,7 @@
  */
 import { KuxiClient, KuxiToolError } from '../kuxi';
 import { formatTable, cellText } from '../format';
-import type { QueryResult } from '@itxuezhe/shared';
+import type { QueryResult } from 'kuxi-shared';
 
 let failures = 0;
 function assert(cond: boolean, msg: string): void {

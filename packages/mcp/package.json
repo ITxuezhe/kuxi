@@ -36,8 +36,8 @@
     "test": "tsx src/test/tools.ts && tsx src/test/e2e.ts"
   },
   "dependencies": {
-    "@itxuezhe/core": "^0.2.2",
-    "@itxuezhe/shared": "^0.2.2",
+    "kuxi-core": "workspace:*",
+    "kuxi-shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {

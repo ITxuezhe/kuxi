@@ -6,7 +6,7 @@
  * 避免每次启动都弹一条报错。所有动作都走 IPC，状态由主进程广播驱动。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type { UpdateStatus } from '@itxuezhe/shared';
+import type { UpdateStatus } from 'kuxi-shared';
 import BaseIcon from './BaseIcon.vue';
 
 const status = ref<UpdateStatus | null>(null);

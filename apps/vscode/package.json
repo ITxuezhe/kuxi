@@ -1,7 +1,7 @@
 {
   "name": "kuxi-vscode",
   "displayName": "库犀 Kuxi（原型）",
-  "description": "VSCode 外壳原型：复用 @itxuezhe/core headless 引擎，连 SQLite 跑只读查询与管线（P5 平台化验证）",
+  "description": "VSCode 外壳原型：复用 kuxi-core headless 引擎，连 SQLite 跑只读查询与管线（P5 平台化验证）",
   "version": "0.0.0",
   "private": true,
   "publisher": "kuxi",
@@ -25,8 +25,8 @@
     "test": "tsx src/test/logic.ts"
   },
   "devDependencies": {
-    "@itxuezhe/core": "workspace:*",
-    "@itxuezhe/shared": "workspace:*",
+    "kuxi-core": "workspace:*",
+    "kuxi-shared": "workspace:*",
     "@types/node": "^22.10.2",
     "@types/vscode": "^1.96.0",
     "esbuild": "^0.24.0",

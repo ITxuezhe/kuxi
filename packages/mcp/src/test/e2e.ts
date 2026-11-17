@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { createKuxiHost } from '@itxuezhe/core';
+import { createKuxiHost } from 'kuxi-core';
 
 let failures = 0;
 function assert(cond: boolean, msg: string): void {

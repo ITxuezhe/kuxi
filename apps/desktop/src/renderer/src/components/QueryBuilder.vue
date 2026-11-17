@@ -9,7 +9,7 @@
  * 安全：只构建 SELECT，默认 LIMIT 100，不提供任何写操作入口。
  */
 import { computed, reactive, ref, watch } from 'vue';
-import type { ColumnInfo, DatabaseSchema, DbType } from '@itxuezhe/shared';
+import type { ColumnInfo, DatabaseSchema, DbType } from 'kuxi-shared';
 import {
   buildQuery,
   FILTER_OPERATORS,

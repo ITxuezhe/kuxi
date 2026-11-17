@@ -10,7 +10,7 @@ import {
   mountBuiltinPlugins,
   normalizeError,
   type ExporterCapability,
-} from '@itxuezhe/core';
+} from 'kuxi-core';
 import {
   DEFAULT_SETTINGS,
   DEMO_CONNECTION_NAME,
@@ -29,7 +29,7 @@ import {
   type ExportWithRequest,
   type IConnectionConfig,
   type SshConfig,
-} from '@itxuezhe/shared';
+} from 'kuxi-shared';
 import {
   decryptSecret,
   encryptSecret,

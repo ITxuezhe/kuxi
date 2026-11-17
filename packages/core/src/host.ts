@@ -19,7 +19,7 @@ import type {
   PipelineNodeInfo,
   PipelineStep,
   TableInfo,
-} from '@itxuezhe/shared';
+} from 'kuxi-shared';
 import { ConnectionManager } from './connection-manager';
 import { Harness } from './plugin/harness';
 import { mountBuiltinPlugins, type TransformerCapability } from './plugin/builtin';

@@ -1,7 +1,7 @@
 /**
  * format — 查询结果的终端对齐表格（纯函数，可单测）
  */
-import type { QueryResult } from '@itxuezhe/shared';
+import type { QueryResult } from 'kuxi-shared';
 
 /** 单元格值转显示串 */
 export function cellText(v: unknown): string {

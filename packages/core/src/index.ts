@@ -1,5 +1,5 @@
 // ============================================================================
-// @itxuezhe/core — headless 数据库引擎
+// kuxi-core — headless 数据库引擎
 // 铁律：本包严禁 import 'electron' / 'vue' / 任何 UI 框架，
 // 以保证后续可被 desktop / VSCode 扩展 / IDEA 守护进程 / MCP server 复用。
 // 硬约束：本包不做 I/O 之外的副作用（不读文件、不发网络请求），

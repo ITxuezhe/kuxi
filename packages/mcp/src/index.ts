@@ -7,7 +7,7 @@
  * 连接配置由 AI 客户端通过 connect 工具传入（本地 stdio，密码不落盘）。
  */
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createKuxiHost } from '@itxuezhe/core';
+import { createKuxiHost } from 'kuxi-core';
 import { createMcpServer } from './server';
 
 async function main(): Promise<void> {

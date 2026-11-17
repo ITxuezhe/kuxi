@@ -9,7 +9,7 @@
  *
  * 密码可省略；省略时导入后可在「编辑连接」里补齐。
  */
-import type { DbType, IConnectionConfig } from '@itxuezhe/shared';
+import type { DbType, IConnectionConfig } from 'kuxi-shared';
 
 export interface ParseResult {
   config?: IConnectionConfig;

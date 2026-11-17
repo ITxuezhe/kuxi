@@ -10,7 +10,7 @@
  * 卡上直接删除；卡下缘显示该步 trace（行数变化）。
  */
 import { ref } from 'vue';
-import type { PipelineNodeInfo, PipelineStep } from '@itxuezhe/shared';
+import type { PipelineNodeInfo, PipelineStep } from 'kuxi-shared';
 import BaseIcon from './BaseIcon.vue';
 
 const props = defineProps<{

@@ -10,8 +10,8 @@
  * 它们既是可用能力，也示范了每类插件的接口长什么样。
  */
 
-import { AI_PROVIDER_PRESETS } from '@itxuezhe/shared';
-import type { ChartPreset, NodeFieldSpec } from '@itxuezhe/shared';
+import { AI_PROVIDER_PRESETS } from 'kuxi-shared';
+import type { ChartPreset, NodeFieldSpec } from 'kuxi-shared';
 import { Harness, type Plugin } from './harness';
 import { createScriptCapability } from './script';
 

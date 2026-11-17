@@ -7,7 +7,7 @@
  * 不新增依赖：图形用内联 SVG，天然跟随主题色，打包体积零增长。
  */
 import { computed, ref, watch } from 'vue';
-import type { ChartPreset, QueryResult } from '@itxuezhe/shared';
+import type { ChartPreset, QueryResult } from 'kuxi-shared';
 import { isNumericType } from '../utils/queryBuilder';
 
 const props = defineProps<{

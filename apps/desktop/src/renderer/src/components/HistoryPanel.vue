@@ -8,7 +8,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import BaseIcon from './BaseIcon.vue';
-import type { HistoryEntry } from '@itxuezhe/shared';
+import type { HistoryEntry } from 'kuxi-shared';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{

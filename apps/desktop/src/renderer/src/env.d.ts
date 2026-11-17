@@ -29,7 +29,7 @@ import type {
   PipelineRunRequest,
   QueryResult,
   UpdateStatus,
-} from '@itxuezhe/shared';
+} from 'kuxi-shared';
 
 declare global {
   /** 连接项（preload listConnections 返回结构；全局声明供各组件直接引用） */

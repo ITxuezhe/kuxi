@@ -9,7 +9,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ConnectionManager } from '@itxuezhe/core';
+import { ConnectionManager } from 'kuxi-core';
 
 describe('getSchema views & triggers', () => {
   const dir = mkdtempSync(join(tmpdir(), 'kuxi-schema-'));

@@ -1,4 +1,4 @@
-import type { SqlAnalysis, SqlKind } from '@itxuezhe/shared';
+import type { SqlAnalysis, SqlKind } from 'kuxi-shared';
 
 /**
  * SQL 静态分析（无 AST 依赖的轻量实现）。

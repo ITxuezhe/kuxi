@@ -8,7 +8,7 @@
  * - 危险原因逐条列出（来自 core 的 analyzeSql），而不是笼统说"有风险"
  * - 默认焦点落在"取消"上：手快连按 Enter 不应该把表删了
  */
-import type { SqlAnalysis } from '@itxuezhe/shared';
+import type { SqlAnalysis } from 'kuxi-shared';
 import Modal from './Modal.vue';
 import BaseIcon from './BaseIcon.vue';
 
