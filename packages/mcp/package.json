@@ -1,19 +1,43 @@
 {
-  "name": "@itxuezhe/mcp",
-  "version": "0.2.0",
+  "name": "kuxi-mcp",
+  "version": "0.2.3",
   "type": "module",
-  "description": "库犀 MCP server：把 @itxuezhe/core 以标准 MCP 工具暴露给 Claude / Cursor 等 AI 客户端（stdio），npx @itxuezhe/mcp 一行接入",
+  "description": "库犀（KuXi）MCP server — 让 Claude / Cursor 等 AI 客户端直接查询 SQLite / MySQL / PostgreSQL，看表结构、跑只读 SQL 与数据清洗管线",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "database",
+    "sql",
+    "sqlite",
+    "mysql",
+    "postgresql",
+    "ai",
+    "claude",
+    "cursor",
+    "库犀",
+    "kuxi"
+  ],
   "engines": {
     "node": ">=22.5.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ITxuezhe/kuxi.git"
+  },
+  "homepage": "https://github.com/ITxuezhe/kuxi",
+  "bugs": {
+    "url": "https://github.com/ITxuezhe/kuxi/issues"
+  },
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "start": "tsx src/index.ts",
     "build": "tsup",
+    "prepublishOnly": "npm run build",
     "test": "tsx src/test/tools.ts && tsx src/test/e2e.ts"
   },
   "dependencies": {
-    "@itxuezhe/core": "workspace:*",
-    "@itxuezhe/shared": "workspace:*",
+    "@itxuezhe/core": "^0.2.2",
+    "@itxuezhe/shared": "^0.2.2",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
@@ -23,20 +47,21 @@
     "typescript": "^5.6.3"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "bin": {
     "kuxi-mcp": "./dist/index.js"
   },
-  "publishConfig": {
-    "access": "public",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-      ".": {
-        "types": "./dist/index.d.ts",
-        "import": "./dist/index.js"
-      }
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

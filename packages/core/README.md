@@ -15,4 +15,4 @@ const res = await callHostTool(host, 'connect', {
 - `callHostTool` + `HOST_TOOLS`：统一工具调用面，被 MCP / daemon / 桌面端共享
 - SQL 分类器：只读 / 写入 / DDL / 危险语句识别
 
-通常不需要直接安装本包——从 [@itxuezhe/mcp](https://www.npmjs.com/package/@itxuezhe/mcp) 或[库犀桌面版](https://github.com/ITxuezhe/kuxi/releases)开始。
+通常不需要直接安装本包——从 [kuxi-mcp](https://www.npmjs.com/package/kuxi-mcp) 或[库犀桌面版](https://github.com/ITxuezhe/kuxi/releases)开始。

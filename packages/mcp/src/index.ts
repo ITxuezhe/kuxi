@@ -2,7 +2,7 @@
  * mcp/bin — stdio 入口
  *
  * 用法（AI 客户端配置示例）：
- *   command: pnpm  args: ["--dir", "<repo>", "--filter", "@itxuezhe/mcp", "start"]
+ *   command: pnpm  args: ["--dir", "<repo>", "--filter", "kuxi-mcp", "start"]
  *   或 node --import tsx packages/mcp/src/index.ts
  * 连接配置由 AI 客户端通过 connect 工具传入（本地 stdio，密码不落盘）。
  */

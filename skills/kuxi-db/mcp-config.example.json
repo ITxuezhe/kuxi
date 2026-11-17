@@ -3,7 +3,7 @@
   "mcpServers": {
     "kuxi": {
       "command": "npx",
-      "args": ["-y", "@itxuezhe/mcp"]
+      "args": ["-y", "kuxi-mcp"]
     }
   }
 }

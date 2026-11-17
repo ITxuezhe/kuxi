@@ -1,4 +1,4 @@
-# @itxuezhe/mcp — 库犀 MCP server
+# kuxi-mcp — 库犀 MCP server
 
 把[库犀（KuXi）](https://github.com/ITxuezhe/kuxi)的数据库能力以标准 MCP 工具暴露给 Claude / Cursor 等 AI 客户端：AI 对话里直接查库、看表结构、跑数据管线。
 
@@ -11,7 +11,7 @@
   "mcpServers": {
     "kuxi": {
       "command": "npx",
-      "args": ["-y", "@itxuezhe/mcp"]
+      "args": ["-y", "kuxi-mcp"]
     }
   }
 }
