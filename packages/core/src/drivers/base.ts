@@ -1,4 +1,4 @@
-import type { QueryResult, DatabaseSchema } from '@kuxi/shared';
+import type { QueryResult, DatabaseSchema } from '@itxuezhe/shared';
 
 /** 驱动查询选项 */
 export interface DriverQueryOptions {

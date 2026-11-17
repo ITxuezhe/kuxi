@@ -11,7 +11,7 @@
 
 import { ipcMain } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { IPC, type ChartPreset, type DashboardCard } from '@kuxi/shared';
+import { IPC, type ChartPreset, type DashboardCard } from '@itxuezhe/shared';
 import { readJson, writeJson } from './store';
 
 const DASHBOARDS_FILE = 'dashboards.json';

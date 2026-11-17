@@ -17,7 +17,7 @@ import {
   type AiConfigPublic,
   type AiMessage,
   type AiTestResult,
-} from '@kuxi/shared';
+} from '@itxuezhe/shared';
 import { decryptSecret, encryptSecret, readJson, writeJson } from './store';
 
 const AI_CONFIG_FILE = 'ai-config.json';

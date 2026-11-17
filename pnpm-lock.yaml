@@ -188,10 +188,10 @@ importers:
         specifier: 0.18.5
         version: 0.18.5
     devDependencies:
-      '@kuxi/core':
+      '@itxuezhe/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@kuxi/shared':
+      '@itxuezhe/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@vitejs/plugin-vue':
@@ -236,10 +236,10 @@ importers:
 
   apps/vscode:
     devDependencies:
-      '@kuxi/core':
+      '@itxuezhe/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@kuxi/shared':
+      '@itxuezhe/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@types/node':
@@ -260,7 +260,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@kuxi/shared':
+      '@itxuezhe/shared':
         specifier: workspace:*
         version: link:../shared
       mysql2:
@@ -297,10 +297,10 @@ importers:
 
   packages/daemon:
     dependencies:
-      '@kuxi/core':
+      '@itxuezhe/core':
         specifier: workspace:*
         version: link:../core
-      '@kuxi/shared':
+      '@itxuezhe/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -316,10 +316,10 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@kuxi/core':
+      '@itxuezhe/core':
         specifier: workspace:*
         version: link:../core
-      '@kuxi/shared':
+      '@itxuezhe/shared':
         specifier: workspace:*
         version: link:../shared
       '@modelcontextprotocol/sdk':

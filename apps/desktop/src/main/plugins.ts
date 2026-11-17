@@ -15,8 +15,8 @@ import { app } from 'electron';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
-import type { Harness, Plugin, PluginType } from '@kuxi/core';
-import type { PluginInfo } from '@kuxi/shared';
+import type { Harness, Plugin, PluginType } from '@itxuezhe/core';
+import type { PluginInfo } from '@itxuezhe/shared';
 
 /** 与 core 的 PluginType 联合保持一致（shared 不反向依赖 core，这里本地校验） */
 const PLUGIN_TYPES: string[] = ['driver', 'ai-provider', 'transformer', 'exporter', 'command', 'panel'];

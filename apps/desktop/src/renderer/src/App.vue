@@ -32,7 +32,7 @@ import { openContextMenu } from './composables/useContextMenu';
 import { refreshAiConfig } from './composables/useAi';
 import { parseConnectionUrl } from './utils/connectionUrl';
 import { useWorkbench, type WorkbenchTab } from './composables/useWorkbench';
-import type { SqlAnalysis } from '@kuxi/shared';
+import type { SqlAnalysis } from '@itxuezhe/shared';
 
 const toast = useToast();
 

@@ -28,8 +28,8 @@ import {
   type ImportRunRequest,
   type ImportSheetInfo,
   type ImportValueKind,
-} from '@kuxi/shared';
-import type { ConnectionManager } from '@kuxi/core';
+} from '@itxuezhe/shared';
+import type { ConnectionManager } from '@itxuezhe/core';
 
 /** 预览行数：足够判断映射是否正确，又不至于让 IPC 变大 */
 const PREVIEW_ROWS = 20;

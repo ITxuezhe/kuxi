@@ -1,8 +1,8 @@
 {
-  "name": "@kuxi/mcp",
+  "name": "@itxuezhe/mcp",
   "version": "0.2.0",
   "type": "module",
-  "description": "库犀 MCP server：把 @kuxi/core 以标准 MCP 工具暴露给 Claude / Cursor 等 AI 客户端（stdio），npx @kuxi/mcp 一行接入",
+  "description": "库犀 MCP server：把 @itxuezhe/core 以标准 MCP 工具暴露给 Claude / Cursor 等 AI 客户端（stdio），npx @itxuezhe/mcp 一行接入",
   "engines": {
     "node": ">=22.5.0"
   },
@@ -12,8 +12,8 @@
     "test": "tsx src/test/tools.ts && tsx src/test/e2e.ts"
   },
   "dependencies": {
-    "@kuxi/core": "workspace:*",
-    "@kuxi/shared": "workspace:*",
+    "@itxuezhe/core": "workspace:*",
+    "@itxuezhe/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {

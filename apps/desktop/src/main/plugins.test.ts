@@ -17,8 +17,8 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { Harness, mountBuiltinPlugins } from '@kuxi/core';
-import type { PluginInfo } from '@kuxi/shared';
+import { Harness, mountBuiltinPlugins } from '@itxuezhe/core';
+import type { PluginInfo } from '@itxuezhe/shared';
 import { loadUserPlugins, reloadUserPlugins, listPlugins } from './plugins';
 
 let root = '';

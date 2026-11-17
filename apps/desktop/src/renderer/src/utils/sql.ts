@@ -7,7 +7,7 @@
  */
 
 import { format } from 'sql-formatter';
-import type { ColumnInfo, DbType } from '@kuxi/shared';
+import type { ColumnInfo, DbType } from '@itxuezhe/shared';
 
 /** 各方言常用类型（建表设计器下拉 + 自增等默认值） */
 /** 各方言类型候选（对齐 Navicat/DataGrip：数值 → 字符串 → 日期时间 → JSON/其他） */

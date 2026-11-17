@@ -1,4 +1,4 @@
-import type { DbError, DbErrorCode, SqlAnalysis } from '@kuxi/shared';
+import type { DbError, DbErrorCode, SqlAnalysis } from '@itxuezhe/shared';
 
 /** 归一化后的可抛出数据库异常 */
 export class DbException extends Error {

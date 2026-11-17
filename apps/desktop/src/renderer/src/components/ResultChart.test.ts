@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from '@vue/test-utils';
-import type { QueryResult } from '@kuxi/shared';
+import type { QueryResult } from '@itxuezhe/shared';
 import ResultChart from './ResultChart.vue';
 
 /**

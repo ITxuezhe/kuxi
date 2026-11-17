@@ -6,7 +6,7 @@
  * stdout 只走协议帧，日志一律 stderr。
  */
 import { createInterface } from 'node:readline';
-import { createKuxiHost } from '@kuxi/core';
+import { createKuxiHost } from '@itxuezhe/core';
 import { handleLine } from './handler';
 
 function main(): void {

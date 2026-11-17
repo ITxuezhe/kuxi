@@ -11,7 +11,7 @@
  * - 引用了未挂载/已删除节点的步骤：产该步 error trace 并停止，不抛穿。
  */
 
-import type { PipelineStep, StepTrace } from '@kuxi/shared';
+import type { PipelineStep, StepTrace } from '@itxuezhe/shared';
 import type { Harness } from './plugin/harness';
 import type { TransformerCapability } from './plugin/builtin';
 

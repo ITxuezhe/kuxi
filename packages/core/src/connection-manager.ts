@@ -3,7 +3,7 @@ import type {
   QueryResult,
   DatabaseSchema,
   SqlAnalysis,
-} from '@kuxi/shared';
+} from '@itxuezhe/shared';
 import { analyzeSql, classifySql } from './sql-classify';
 import {
   normalizeError,

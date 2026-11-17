@@ -9,7 +9,7 @@ import type {
   ViewInfo,
   RoutineInfo,
   TriggerInfo,
-} from '@kuxi/shared';
+} from '@itxuezhe/shared';
 import type { IDriver } from './base';
 import { openSshTunnel, type SshTunnel } from '../ssh-tunnel';
 

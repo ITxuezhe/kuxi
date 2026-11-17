@@ -7,7 +7,7 @@ import type {
   TableInfo,
   ViewInfo,
   TriggerInfo,
-} from '@kuxi/shared';
+} from '@itxuezhe/shared';
 import type { IDriver, DriverQueryOptions } from './base';
 
 // node:sqlite 用运行时 require 加载：静态 import 经 tsup/esbuild 打包会被剥掉

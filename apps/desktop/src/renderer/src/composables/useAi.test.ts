@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AiMessage } from '@kuxi/shared';
+import type { AiMessage } from '@itxuezhe/shared';
 import { askAi, buildPipelinePrompt, extractPipelineSteps, extractSql } from './useAi';
 
 /**

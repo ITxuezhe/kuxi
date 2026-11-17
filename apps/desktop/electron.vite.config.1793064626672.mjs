@@ -20,14 +20,14 @@ var electron_vite_config_default = defineConfig({
     // mysql2 / pg 等真正的 npm 依赖保持 external，运行时从 node_modules 加载。
     plugins: [
       externalizeDepsPlugin({
-        exclude: ["@kuxi/core", "@kuxi/shared"]
+        exclude: ["@itxuezhe/core", "@itxuezhe/shared"]
       })
     ]
   },
   preload: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ["@kuxi/shared"]
+        exclude: ["@itxuezhe/shared"]
       })
     ]
   },

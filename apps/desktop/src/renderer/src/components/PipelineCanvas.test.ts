@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import type { PipelineNodeInfo, PipelineStep } from '@kuxi/shared';
+import type { PipelineNodeInfo, PipelineStep } from '@itxuezhe/shared';
 import PipelineCanvas from './PipelineCanvas.vue';
 
 const NODES: PipelineNodeInfo[] = [

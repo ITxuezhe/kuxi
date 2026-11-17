@@ -1,5 +1,5 @@
 {
-  "name": "@kuxi/core",
+  "name": "@itxuezhe/core",
   "version": "0.2.0",
   "type": "module",
   "description": "库犀无头数据库引擎：驱动、连接管理、SQL 分类、管线、插件（可在任意 Node >= 22 运行时复用）",
@@ -8,7 +8,7 @@
     "node": ">=22.5.0"
   },
   "dependencies": {
-    "@kuxi/shared": "workspace:*",
+    "@itxuezhe/shared": "workspace:*",
     "mysql2": "^3.11.3",
     "pg": "^8.13.1",
     "pg-cursor": "^2.22.1",

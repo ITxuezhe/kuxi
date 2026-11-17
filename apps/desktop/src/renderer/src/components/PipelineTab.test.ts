@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import type { PipelineNodeInfo, PipelineRunOutcome, PipelineRunRequest, QueryResult } from '@kuxi/shared';
+import type { PipelineNodeInfo, PipelineRunOutcome, PipelineRunRequest, QueryResult } from '@itxuezhe/shared';
 import type { WorkbenchTab } from '../composables/useWorkbench';
 import PipelineTab from './PipelineTab.vue';
 

@@ -14,7 +14,7 @@
  * App 的 ConfirmDialog / InfoDialog，避免 store 直接依赖 UI 弹窗。
  */
 import { computed, ref, type Ref } from 'vue';
-import type { DbType, PipelineDoc, QueryResult, SqlAnalysis } from '@kuxi/shared';
+import type { DbType, PipelineDoc, QueryResult, SqlAnalysis } from '@itxuezhe/shared';
 import {
   applyPagingToSql,
   applySortToSql,

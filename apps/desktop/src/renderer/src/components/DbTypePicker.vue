@@ -6,7 +6,7 @@
  * 图标使用内联 SVG（禁止外部图标库）。
  * 组件保持受控（v-model:modelValue），不持有业务状态。
  */
-import type { DbType } from '@kuxi/shared';
+import type { DbType } from '@itxuezhe/shared';
 
 interface DbTypeOption {
   name: DbType;

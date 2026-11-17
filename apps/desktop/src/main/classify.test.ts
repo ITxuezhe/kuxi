@@ -7,7 +7,7 @@
  * 同时普通多语句（SELECT 1; SELECT 2）与字符串内分号的行为不能回归。
  */
 import { describe, it, expect } from 'vitest';
-import { analyzeSql } from '@kuxi/core';
+import { analyzeSql } from '@itxuezhe/core';
 
 describe('analyzeSql 多语句守卫', () => {
   it('普通多语句仍被识别（守卫不能放松）', () => {

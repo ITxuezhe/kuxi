@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { DbType, HistoryEntry } from '@kuxi/shared';
+import type { DbType, HistoryEntry } from '@itxuezhe/shared';
 import { readJson, writeJson } from './store';
 
 const HISTORY_FILE = 'history.json';

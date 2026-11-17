@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@kuxi/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+      '@itxuezhe/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
       // Vite 的内置模块表里没有 node:sqlite，测试里改走适配层（见 src/test/sqlite-shim.ts）
       'node:sqlite': resolve(__dirname, 'src/test/sqlite-shim.ts'),
     },

@@ -13,7 +13,7 @@
  * 隐私：只发送表结构、问题文本与历史 SQL，不发送任何数据行。
  */
 import { computed, nextTick, ref, watch } from 'vue';
-import type { AiMessage } from '@kuxi/shared';
+import type { AiMessage } from '@itxuezhe/shared';
 import {
   askAi,
   buildSchemaText,

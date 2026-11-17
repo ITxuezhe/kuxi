@@ -1,5 +1,5 @@
 {
-  "name": "@kuxi/desktop",
+  "name": "@itxuezhe/desktop",
   "version": "0.2.0",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
@@ -30,8 +30,8 @@
     "xlsx": "0.18.5"
   },
   "devDependencies": {
-    "@kuxi/core": "workspace:*",
-    "@kuxi/shared": "workspace:*",
+    "@itxuezhe/core": "workspace:*",
+    "@itxuezhe/shared": "workspace:*",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.5.1",
     "electron": "^35.0.0",

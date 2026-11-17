@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
-import { IPC, type UpdateStatus } from '@kuxi/shared';
+import { IPC, type UpdateStatus } from '@itxuezhe/shared';
 
 /**
  * 自动更新（electron-updater）。

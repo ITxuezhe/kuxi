@@ -1,5 +1,5 @@
 {
-  "name": "@kuxi/shared",
+  "name": "@itxuezhe/shared",
   "version": "0.2.0",
   "type": "module",
   "description": "库犀跨包共享的类型与常量（零运行时依赖）",

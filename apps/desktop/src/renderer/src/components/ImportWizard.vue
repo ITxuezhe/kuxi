@@ -16,7 +16,7 @@ import type {
   ImportParseOptions,
   ImportValueKind,
   TableInfo,
-} from '@kuxi/shared';
+} from '@itxuezhe/shared';
 import { generateCreateTable, type FieldDef } from '../utils/sql';
 import { useToast } from '../composables/useToast';
 import BaseIcon from './BaseIcon.vue';

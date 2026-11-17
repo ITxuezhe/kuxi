@@ -8,7 +8,7 @@
 import TableDesignerForm from './TableDesignerForm.vue';
 import Modal from './Modal.vue';
 import { computed } from 'vue';
-import type { DbType } from '@kuxi/shared';
+import type { DbType } from '@itxuezhe/shared';
 
 const props = defineProps<{
   open: boolean;

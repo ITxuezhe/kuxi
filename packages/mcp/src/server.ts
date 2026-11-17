@@ -8,7 +8,7 @@
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { callHostTool, HOST_TOOLS, type KuxiHost } from '@kuxi/core';
+import { callHostTool, HOST_TOOLS, type KuxiHost } from '@itxuezhe/core';
 
 /** tools/list 响应体（纯数据，便于测试） */
 export function buildToolList(): Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> {

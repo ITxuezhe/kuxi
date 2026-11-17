@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import type { AddressInfo } from 'node:net';
 import ssh2 from 'ssh2';
-import type { SshConfig } from '@kuxi/shared';
+import type { SshConfig } from '@itxuezhe/shared';
 import { DbException } from './errors';
 
 /** SSH 建连超时（ms） */

@@ -2,7 +2,7 @@
 /**
  * 导入向导的主进程端到端测试：
  * CSV / Excel 解析 → IPC 处理 → SQLite 建表 / 追加 / 覆盖，全部走真实驱动。
- * electron 的 dialog / ipcMain 用 mock 替代，其余（@kuxi/core、xlsx）都是真实依赖。
+ * electron 的 dialog / ipcMain 用 mock 替代，其余（@itxuezhe/core、xlsx）都是真实依赖。
  */
 import { describe, it, expect, vi } from 'vitest';
 import { writeFileSync, unlinkSync } from 'node:fs';
@@ -25,8 +25,8 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { IPC } from '@kuxi/shared';
-import { ConnectionManager } from '@kuxi/core';
+import { IPC } from '@itxuezhe/shared';
+import { ConnectionManager } from '@itxuezhe/core';
 import * as XLSX from 'xlsx';
 import { parseDelimited, detectDelimiter, registerImportIpc } from './import';
 

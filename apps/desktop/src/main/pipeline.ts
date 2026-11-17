@@ -2,7 +2,7 @@
  * pipeline — 数据管线的 IPC 注册（主进程薄壳）
  *
  * 职责边界：
- * - 引擎本体在 @kuxi/core（runPipelineSteps），这里只做护栏 + 持久化 + 信封包装；
+ * - 引擎本体在 @itxuezhe/core（runPipelineSteps），这里只做护栏 + 持久化 + 信封包装；
  * - 管线文档落 userData/pipelines.json（readJson/writeJson，损坏自动回退空列表）；
  * - 节点清单直接来自 harness.listByType('transformer')——挂一个新节点，UI 自动多一项；
  * - 维护节点（cap.sink）在 core 里只透传数据，真正写库在这里执行
@@ -25,13 +25,13 @@ import {
   type QueryResult,
   type SinkWriteMode,
   type SinkWriteResult,
-} from '@kuxi/shared';
+} from '@itxuezhe/shared';
 import {
   runPipelineSteps,
   type ConnectionManager,
   type Harness,
   type TransformerCapability,
-} from '@kuxi/core';
+} from '@itxuezhe/core';
 import { readJson, writeJson } from './store';
 import { quoteIdent } from './import';
 

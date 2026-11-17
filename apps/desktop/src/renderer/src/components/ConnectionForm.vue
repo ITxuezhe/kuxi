@@ -6,7 +6,7 @@
  * mode='edit'  ：编辑，保存时 updateConnection；密码留空 = 不修改（保留已存密码）
  */
 import { computed, reactive, ref, watch } from 'vue';
-import { DEFAULT_PORTS, type DbType, type IConnectionConfig } from '@kuxi/shared';
+import { DEFAULT_PORTS, type DbType, type IConnectionConfig } from '@itxuezhe/shared';
 import DbTypePicker from './DbTypePicker.vue';
 import BaseIcon from './BaseIcon.vue';
 import { useToast } from '../composables/useToast';

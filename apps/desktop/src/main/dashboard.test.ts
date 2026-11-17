@@ -26,7 +26,7 @@ vi.mock('./store', () => ({
   },
 }));
 
-import { IPC, type DashboardCard } from '@kuxi/shared';
+import { IPC, type DashboardCard } from '@itxuezhe/shared';
 import { registerDashboardIpc, MAX_DASHBOARD_ROWS } from './dashboard';
 
 registerDashboardIpc();
