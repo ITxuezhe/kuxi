@@ -53,3 +53,6 @@ Phase0-任务清单.md
 !apps/desktop/build/*.svg
 !apps/desktop/build/*.png
 !apps/desktop/build/*.icns
+
+# npm pack 产物
+*.tgz
