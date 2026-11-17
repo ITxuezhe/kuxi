@@ -269,9 +269,11 @@ export function useTheme(): {
   themes: readonly ThemeOption[];
   densities: readonly DensityOption[];
   fontSizes: readonly FontSizeOption[];
+  backgroundImage: Readonly<Ref<string>>;
   setTheme: (next: ThemeName) => void;
   setDensity: (next: DensityName) => void;
   setFontSize: (next: FontSizeName) => void;
+  setBackgroundImage: (next: string) => void;
 } {
   const themeOption = computed<ThemeOption>(
     () => THEMES.find((item) => item.name === theme.value) ?? THEMES[0],

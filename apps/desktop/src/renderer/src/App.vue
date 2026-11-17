@@ -454,7 +454,7 @@ async function onExport(): Promise<void> {
   fileBusy.value = true;
   try {
     const res = await window.kuxi.exportConnections();
-    if (res.ok && res.path) {
+    if (res.ok) {
       toast.success(`已导出连接到 ${res.path}`);
     } else if (res.canceled) {
       return;
@@ -744,7 +744,6 @@ onMounted(async () => {
 
       <span class="conn-chip" :title="currentLabel">
         <span class="conn-dot" :class="{ on: currentConnection?.active }" aria-hidden="true"></span>
-        <span>当前连接：</span>
         <strong>{{ currentLabel }}</strong>
       </span>
 

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import type { PipelineNodeInfo, PipelineRunOutcome, QueryResult } from '@kuxi/shared';
+import type { PipelineNodeInfo, PipelineRunOutcome, PipelineRunRequest, QueryResult } from '@kuxi/shared';
 import type { WorkbenchTab } from '../composables/useWorkbench';
 import PipelineTab from './PipelineTab.vue';
 
@@ -40,7 +40,7 @@ const SOURCE: QueryResult = {
 };
 
 const runPipeline = vi.fn(
-  async (): Promise<PipelineRunOutcome> => ({
+  async (_req: PipelineRunRequest): Promise<PipelineRunOutcome> => ({
     status: 'ok',
     result: { columns: ['city', 'amount'], rows: [{ city: '北京', amount: 10 }], rowCount: 1, tookMs: 2, kind: 'read' },
     trace: [{ stepId: 's1', node: 'transformer.dedupe', inRows: 3, outRows: 2, ms: 1, outColumns: ['city', 'amount'] }],
@@ -117,16 +117,31 @@ describe('PipelineTab', () => {
     expect(wrapper.find('.ptab-preview').text()).toContain('北京');
   });
 
-  it('保存管线：补 id 后走 pipelineUpsert', async () => {
+  it('保存管线：点击名称改名后经「⋯」菜单保存', async () => {
     const tab = makeTab();
     const wrapper = mount(PipelineTab, { props: { tab } });
     await flushPromises();
 
-    await wrapper.find('.ptab-savebar input').setValue('我的管线');
-    const saveBtns = wrapper.findAll('.ptab-savebar .btn');
+    // 点击名称 → 行内改名 → Enter 提交
+    await wrapper.find('.ptab-name').trigger('click');
+    await wrapper.find('.ptab-name-input').setValue('我的管线');
+    await wrapper.find('.ptab-name-input').trigger('keyup.enter');
+
+    // 打开「⋯」菜单 → 保存
+    await wrapper.find('.ptab-more .btn-icon').trigger('click');
+    const saveBtns = wrapper.findAll('.ptab-more-panel .btn');
     await saveBtns[0]!.trigger('click');
     await flushPromises();
     expect(tab.pipeline!.name).toBe('我的管线');
     expect(tab.pipeline!.id).toMatch(/[0-9a-f-]{36}/);
+  });
+
+  it('AI 输入行默认收起，点 sparkles 展开', async () => {
+    const tab = makeTab();
+    const wrapper = mount(PipelineTab, { props: { tab } });
+    await flushPromises();
+    expect(wrapper.find('.ptab-ai').exists()).toBe(false);
+    await wrapper.find('.ptab-steps-head .btn-icon').trigger('click');
+    expect(wrapper.find('.ptab-ai').exists()).toBe(true);
   });
 });

@@ -8,7 +8,7 @@
  * 打开时焦点进面板（键盘可直接操作菜单项）。
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import BaseIcon from './BaseIcon.vue';
+import BaseIcon, { type IconName } from './BaseIcon.vue';
 
 const props = defineProps<{
   /** 历史抽屉是否打开（收纳后仍需高亮触发钮，让用户知道入口在哪） */
@@ -23,7 +23,7 @@ type MoreAction = 'history' | 'builder' | 'templates' | 'import' | 'plugins' | '
 
 interface MenuItem {
   name: MoreAction;
-  icon: string;
+  icon: IconName;
   label: string;
   hint: string;
   /** 该项是否处于"打开中"状态（历史抽屉） */

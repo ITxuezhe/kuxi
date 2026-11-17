@@ -37,19 +37,53 @@
 - 多服务商：DeepSeek / OpenAI / 本地 Ollama / 任意 OpenAI 兼容接口
 - API Key 加密存储，配置内置连通性测试
 
-**数据管线（小白可用的整理 / 清洗 / 维护）**
+**数据管线（小白可用的整理 / 清洗 / 维护 / 分析）**
 
-- 可视化步骤编排：去重、过滤、列计算、聚合、图表等节点逐步应用，每步可回看与撤销
+- 可视化步骤编排：去重、过滤、列计算、聚合、图表等节点逐步应用，每步可回看与撤销；列表 / 画布双视图（画布支持拖拽重排、trace 行数变化可视化）
+- 维护扫描节点：`inspector.health`（行数 / 空值 / 重复行 / 全空列体检）与 `inspector.index`（按列区分度给索引建议）
 - 维护节点「写回数据库」：管线结果写回目标表（追加 / 覆盖），事务 + 分批写入，只读模式自动拒绝
 - AI 生成管线：用一句话描述需求，自动生成管线步骤草稿
 - L2 脚本节点：管线中插入 JavaScript 沙箱代码自定义处理
 - L3 插件系统：本地插件目录热加载，官方示例见 `examples/plugins/`
+- 分析仪表盘：管线图表结果一键「存入仪表盘」，卡片持久化（快照离线可看），单例标签集中查看
 
 **平台化（一个 core，多种外壳）**
 
-- MCP server：把库犀的 8 个能力（连库 / 列表 / 只读查询 / 跑管线等）暴露给 Claude Code、Cursor 等 AI 客户端
+- MCP server：把库犀的 8 个能力（连库 / 列表 / 只读查询 / 跑管线等）暴露给 Claude Code、Cursor 等 AI 客户端，npm 一行接入：`npx @kuxi/mcp`
+- 核心包已发布 npm：`@kuxi/shared` / `@kuxi/core` / `@kuxi/mcp`（ESM，要求 Node >= 22.5）
+- Skill 打包：`skills/kuxi-db/`（AI 客户端可用的指令 + MCP 配置模板）
 - JSON-RPC daemon：行分隔 JSON-RPC over stdio，供 IDEA 等宿主集成
 - VSCode 扩展原型：`apps/vscode`
+
+**MCP server 接入（已用 SDK Client over stdio 端到端实测）**
+
+方式一（npm 包，推荐；要求 Node >= 22.5）：
+
+```json
+{
+  "mcpServers": {
+    "kuxi": {
+      "command": "npx",
+      "args": ["-y", "@kuxi/mcp"]
+    }
+  }
+}
+```
+
+方式二（从源码跑，`<repo>` 换成本仓库路径）：
+
+```json
+{
+  "mcpServers": {
+    "kuxi": {
+      "command": "pnpm",
+      "args": ["--dir", "<repo>", "--filter", "@kuxi/mcp", "start"]
+    }
+  }
+}
+```
+
+可用工具：`connect` / `list_connections` / `disconnect` / `list_tables` / `get_schema` / `run_readonly_query` / `list_pipeline_nodes` / `run_pipeline`。查询类工具一律只读（写 / DDL / 危险语句拒绝），`run_pipeline` 不支持写回节点；连接配置由 AI 对话中通过 `connect` 传入，密码不落盘。
 
 **体验**
 
@@ -82,7 +116,7 @@ apps/vscode          VSCode 扩展原型
 pnpm install        # 安装依赖
 pnpm dev            # 启动桌面端（electron-vite dev）
 pnpm build          # 构建
-pnpm typecheck      # 类型检查
+pnpm typecheck      # 类型检查（含 desktop 渲染端 vue-tsc）
 pnpm test:core      # core 包冒烟测试
 pnpm test:desktop   # 桌面端 vitest
 pnpm test:hosts     # MCP / daemon / vscode 外壳测试
@@ -99,9 +133,12 @@ pnpm dist           # 打安装包（electron-builder）
 - [x] 连接管理交互（新建 / 编辑 / 删除 / 重连 / 搜索 / 导入导出）
 - [x] AI 面板与模型配置
 - [x] 可扩展数据管线（整理 → 清洗 → 维护 → 分析，含写回与 AI 生成）
+- [x] 维护扫描节点（健康体检 / 索引建议）
+- [x] 分析仪表盘（图表卡片持久化）
+- [x] 管线画布视图（拖拽重排）
 - [x] 插件体系（L2 脚本节点 + L3 本地插件）
 - [x] 安装包与自动更新
-- [x] 平台化：MCP server / daemon / VSCode 外壳
+- [x] 平台化：MCP server（端到端实测）/ daemon / VSCode 外壳 / Skill 打包
 - [ ] 云同步与商业化（中转计费、企业版）
 
 ## 许可证

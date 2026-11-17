@@ -42,6 +42,7 @@ import { initUpdater, registerUpdateIpc } from './updater';
 import { clearHistory, deleteHistory, listHistory, recordHistory, toggleFavorite } from './history';
 import { registerImportIpc } from './import';
 import { registerPipelineIpc } from './pipeline';
+import { registerDashboardIpc } from './dashboard';
 import { getPluginsDir, listPlugins, loadUserPlugins, reloadUserPlugins } from './plugins';
 
 const manager = new ConnectionManager();
@@ -693,6 +694,9 @@ function registerIpc(): void {
 
   // ---- 数据管线（节点清单 / 保存 / 重放执行 / 维护节点写回）----
   registerPipelineIpc(harness, { manager, isReadOnly: () => getSettings().readOnly });
+
+  // ---- 分析仪表盘（图表卡片持久化，不触数据库）----
+  registerDashboardIpc();
 
   // ---- 插件系统（清单 / 重载 / 打开插件目录）----
   ipcMain.handle(IPC.PluginList, (): unknown => listPlugins(harness));

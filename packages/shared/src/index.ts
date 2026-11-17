@@ -354,6 +354,12 @@ export const IPC = {
   PipelineDelete: 'pipe:delete',
   /** 数据管线：对行数据依序应用步骤（rows 过 IPC，主进程 harness 执行） */
   PipelineRun: 'pipe:run',
+  /** 分析仪表盘：已保存卡片列表 */
+  DashboardList: 'dash:list',
+  /** 分析仪表盘：新建/覆盖保存卡片（返回更新后的完整列表） */
+  DashboardUpsert: 'dash:upsert',
+  /** 分析仪表盘：删除卡片（返回更新后的完整列表） */
+  DashboardDelete: 'dash:delete',
   /** 插件系统：已挂载插件清单（内置 + 用户目录） */
   PluginList: 'plugin:list',
   /** 插件系统：重新加载 userData/plugins/*.js（返回更新后的清单） */
@@ -839,6 +845,28 @@ export interface SinkWriteResult {
 export type PipelineRunOutcome =
   | { status: 'ok'; result: QueryResult; trace: StepTrace[]; sink?: SinkWriteResult }
   | { status: 'error'; message: string; trace: StepTrace[] };
+
+/**
+ * 仪表盘卡片（P5 补全，借鉴 Metabase「问题 → 图表 → 面板」）：
+ * 图表预设 + 管线运行结果快照。存快照而非引用，仪表盘离线可看、
+ * 不随连接断开失效；「打开源管线」仅存 id 供跳转。
+ */
+export interface DashboardCard {
+  id: string;
+  title: string;
+  preset: ChartPreset;
+  /** 保存时的管线结果快照（渲染端截断至 500 行） */
+  snapshot: {
+    columns: string[];
+    rows: Record<string, unknown>[];
+    rowCount: number;
+  };
+  /** 来源管线（可选，用于跳回管线标签重放） */
+  pipelineId?: string;
+  pipelineName?: string;
+  createdAt: number;
+  updatedAt: number;
+}
 
 /**
  * 插件清单项（plugin:list 返回：内置 + 用户目录加载）。

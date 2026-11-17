@@ -1,5 +1,4 @@
-// @ts-ignore Node 22.5+ 内置实验模块 node:sqlite，旧版 @types/node 可能缺类型
-import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
 import type {
   IConnectionConfig,
   QueryResult,
@@ -11,12 +10,19 @@ import type {
 } from '@kuxi/shared';
 import type { IDriver, DriverQueryOptions } from './base';
 
+// node:sqlite 用运行时 require 加载：静态 import 经 tsup/esbuild 打包会被剥掉
+// node: 前缀变成裸 'sqlite'（该内置模块在 Node 里必须带前缀），导致发布产物崩溃。
+const nodeRequire = createRequire(import.meta.url);
+// @ts-ignore Node 22.5+ 内置实验模块 node:sqlite，旧版 @types/node 可能缺类型
+const { DatabaseSync } = nodeRequire('node:sqlite') as typeof import('node:sqlite');
+
 /**
  * SQLite 驱动（基于 Node 22 内置 node:sqlite，零原生编译依赖）。
  * 运行时要求 Node >= 22.5。若需在不支持该模块的环境运行，可替换为 better-sqlite3（API 对齐）。
  */
 export class SqliteDriver implements IDriver {
-  private db: DatabaseSync | null = null;
+  // @ts-ignore Node 22.5+ 内置实验模块 node:sqlite，旧版 @types/node 可能缺类型
+  private db: import('node:sqlite').DatabaseSync | null = null;
   private readonly filename: string;
 
   constructor(config: IConnectionConfig) {

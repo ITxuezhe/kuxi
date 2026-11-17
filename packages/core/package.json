@@ -1,9 +1,12 @@
 {
   "name": "@kuxi/core",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.2.0",
   "type": "module",
+  "description": "库犀无头数据库引擎：驱动、连接管理、SQL 分类、管线、插件（可在任意 Node >= 22 运行时复用）",
   "main": "./src/index.ts",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "dependencies": {
     "@kuxi/shared": "workspace:*",
     "mysql2": "^3.11.3",
@@ -15,11 +18,27 @@
     "@types/pg": "^8.11.10",
     "@types/pg-cursor": "^2.7.2",
     "@types/ssh2": "^1.15.6",
+    "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   },
   "scripts": {
+    "build": "tsup",
     "test": "tsx src/test/smoke.ts && tsx src/test/pipeline.ts && tsx src/test/script-node.ts && tsx src/test/host.ts",
     "harness": "tsx src/test/harness-demo.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
   }
 }

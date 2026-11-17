@@ -88,7 +88,9 @@ describe('pipe:nodes', () => {
     expect(ids).toContain('transformer.chart');
     expect(ids).toContain('transformer.script'); // P4 批次1：L2 脚本节点
     expect(ids).toContain('transformer.db-write'); // P4 批次2：维护节点
-    expect(nodes.length).toBe(11);
+    expect(ids).toContain('inspector.health'); // P5 补全：维护扫描
+    expect(ids).toContain('inspector.index');
+    expect(nodes.length).toBe(13);
     const dedupe = nodes.find((n) => n.id === 'transformer.dedupe')!;
     expect(dedupe.fields[0]).toMatchObject({ key: 'field', optionsFrom: 'columns' });
   });

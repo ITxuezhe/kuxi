@@ -9,6 +9,7 @@ import type {
   AppSettings,
   ConnectionExportOutcome,
   ConnectionImportOutcome,
+  DashboardCard,
   ExecuteOutcome,
   ExporterInfo,
   ExportOutcome,
@@ -123,6 +124,14 @@ const api = {
   pipelineDelete: (id: string): Promise<PipelineDoc[]> => ipcRenderer.invoke(IPC.PipelineDelete, id),
   pipelineRun: (req: PipelineRunRequest): Promise<PipelineRunOutcome> =>
     ipcRenderer.invoke(IPC.PipelineRun, req),
+
+  // ---- 分析仪表盘（图表卡片持久化）----
+  dashboardList: (): Promise<DashboardCard[]> => ipcRenderer.invoke(IPC.DashboardList),
+  /** 新建/覆盖保存（空 id 由主进程补），返回更新后的完整列表 */
+  dashboardUpsert: (card: DashboardCard): Promise<DashboardCard[]> =>
+    ipcRenderer.invoke(IPC.DashboardUpsert, card),
+  dashboardDelete: (id: string): Promise<DashboardCard[]> =>
+    ipcRenderer.invoke(IPC.DashboardDelete, id),
 
   // ---- 插件系统（清单 / 重载 / 打开插件目录）----
   pluginList: (): Promise<PluginInfo[]> => ipcRenderer.invoke(IPC.PluginList),

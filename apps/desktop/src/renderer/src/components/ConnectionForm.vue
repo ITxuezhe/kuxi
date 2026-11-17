@@ -327,7 +327,7 @@ function applyParsed(p: Record<string, unknown>): void {
   }
   // 只标记已填字段，未填字段的校验提示留给用户补全时触发
   (Object.keys(touched) as Array<keyof typeof touched>).forEach((k) => {
-    const v = form[k];
+    const v = (form as unknown as Record<string, string | number | boolean>)[k];
     if (typeof v === 'string' && v.trim()) touched[k] = true;
     else if (typeof v === 'number' && v > 0) touched[k] = true;
   });

@@ -11,7 +11,7 @@ const wb = useWorkbench();
 
 function onCreated(): void {
   wb.bumpSchema();
-  wb.close(tab.id);
+  wb.close(props.tab.id);
 }
 </script>
 
@@ -21,9 +21,9 @@ function onCreated(): void {
       :db-type="wb.currentDbType.value"
       :connected="wb.connected.value"
       :connection-id="wb.connectionId.value"
-      :initial-name="tab.designTable"
+      :initial-name="props.tab.designTable"
       @created="onCreated"
-      @close="() => wb.close(tab.id)"
+      @close="() => wb.close(props.tab.id)"
     />
   </div>
 </template>

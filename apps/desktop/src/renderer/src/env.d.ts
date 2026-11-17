@@ -9,6 +9,7 @@ import type {
   AppSettings,
   ConnectionExportOutcome,
   ConnectionImportOutcome,
+  DashboardCard,
   DatabaseSchema,
   ExecuteOutcome,
   ExporterInfo,
@@ -30,31 +31,32 @@ import type {
   UpdateStatus,
 } from '@kuxi/shared';
 
-interface ConnectionItem {
-  id: string;
-  name: string;
-  type: string;
-  filename?: string;
-  host?: string;
-  port?: number;
-  user?: string;
-  database?: string;
-  ssl?: boolean;
-  /** SSH 隧道的非敏感字段 */
-  ssh?: {
-    enabled: boolean;
+declare global {
+  /** 连接项（preload listConnections 返回结构；全局声明供各组件直接引用） */
+  interface ConnectionItem {
+    id: string;
+    name: string;
+    type: string;
+    filename?: string;
     host?: string;
     port?: number;
     user?: string;
-    privateKeyPath?: string;
-  };
-  hasPassword: boolean;
-  /** 是否已保存 SSH 密码（编辑时留空 = 不修改） */
-  hasSshPassword: boolean;
-  active: boolean;
-}
+    database?: string;
+    ssl?: boolean;
+    /** SSH 隧道的非敏感字段 */
+    ssh?: {
+      enabled: boolean;
+      host?: string;
+      port?: number;
+      user?: string;
+      privateKeyPath?: string;
+    };
+    hasPassword: boolean;
+    /** 是否已保存 SSH 密码（编辑时留空 = 不修改） */
+    hasSshPassword: boolean;
+    active: boolean;
+  }
 
-declare global {
   interface Window {
     kuxi: {
       // ---- 数据库 ----
@@ -127,6 +129,12 @@ declare global {
       pipelineUpsert(doc: PipelineDoc): Promise<PipelineDoc[]>;
       pipelineDelete(id: string): Promise<PipelineDoc[]>;
       pipelineRun(req: PipelineRunRequest): Promise<PipelineRunOutcome>;
+
+      // ---- 分析仪表盘 ----
+      dashboardList(): Promise<DashboardCard[]>;
+      /** 新建/覆盖保存（空 id 由主进程补），返回更新后的完整列表 */
+      dashboardUpsert(card: DashboardCard): Promise<DashboardCard[]>;
+      dashboardDelete(id: string): Promise<DashboardCard[]>;
 
       // ---- 插件系统 ----
       pluginList(): Promise<PluginInfo[]>;

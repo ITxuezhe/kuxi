@@ -210,6 +210,38 @@ function main(): void {
   const sinkBadMode = run(src, [step('transformer.db-write', { connectionId: 'c1', table: 't1', mode: 'upsert' })]);
   assert(Boolean(sinkBadMode.error) && sinkBadMode.error!.includes('模式'), `非法模式报错（实际 ${sinkBadMode.error ?? 'none'}）`);
 
+  // 14) 维护扫描节点（P5 补全）
+  console.log('\n[14] inspector.health / inspector.index');
+  const scanSrc = [
+    { id: 1, city: '北京', note: null },
+    { id: 2, city: '上海', note: '' },
+    { id: 3, city: '杭州', note: null },
+    { id: 3, city: '杭州', note: null }, // 与上一行完全重复
+  ];
+  const health = run(scanSrc, [step('inspector.health')]);
+  assert(!health.error && health.rows.length === 1, '健康扫描输出单行汇总');
+  const h0 = health.rows[0] as Record<string, unknown>;
+  assert(h0['rows'] === 4 && h0['columns'] === 3, `行/列数正确（实际 ${h0['rows']}/${h0['columns']}）`);
+  assert(h0['nullCells'] === 4, `空单元格计 4（实际 ${h0['nullCells']}）`);
+  assert(h0['dupRows'] === 1, `完全重复行计 1（实际 ${h0['dupRows']}）`);
+  assert(h0['emptyColumns'] === 1, `全空列计 1（note 列，实际 ${h0['emptyColumns']}）`);
+
+  const indexSrc = [
+    { id: 1, city: '北京', note: null },
+    { id: 2, city: '上海', note: '' },
+    { id: 3, city: '北京', note: 'x' },
+  ];
+  const indexRun = run(indexSrc, [step('inspector.index')]);
+  assert(!indexRun.error && indexRun.rows.length === 3, '索引建议输出每列一行');
+  const idRow = indexRun.rows.find((r) => r['column'] === 'id') as Record<string, unknown>;
+  const cityRow = indexRun.rows.find((r) => r['column'] === 'city') as Record<string, unknown>;
+  assert(String(idRow['suggestion']).includes('唯一'), `id 列判为唯一键候选（实际 ${idRow['suggestion']}）`);
+  assert(String(cityRow['suggestion']).includes('低') || String(cityRow['suggestion']).includes('普通'), `city 列给出区分度建议（实际 ${cityRow['suggestion']}）`);
+  const indexPick = run(indexSrc, [step('inspector.index', { fields: ['id'] })]);
+  assert(indexPick.rows.length === 1 && indexPick.rows[0]['column'] === 'id', 'fields 过滤只分析指定列');
+  const indexTiny = run([{ id: 1 }], [step('inspector.index')]);
+  assert(String(indexTiny.rows[0]['suggestion']).includes('过少'), '样本 <2 行给出不可评估提示');
+
   console.log(`\n${failures === 0 ? '🎉 pipeline 全部验证通过' : `⚠️  有 ${failures} 项失败`}`);
   if (failures > 0) process.exitCode = 1;
 }

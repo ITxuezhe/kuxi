@@ -133,7 +133,8 @@ function isSqlKeyword(value: string): boolean {
  */
 function defaultInputType(f: FieldDef): string {
   if (!isDateLike(f.type)) return 'text';
-  return isSqlKeyword(f.defaultValue) ? 'text' : dateInputType(f.type);
+  if (f.defaultValue && isSqlKeyword(f.defaultValue)) return 'text';
+  return dateInputType(f.type);
 }
 /** 日期型默认值快捷填入「当前时间」关键字（生成 DDL 时按关键字原样输出） */
 function setDefaultNow(index: number): void {
@@ -269,7 +270,7 @@ async function onCreate(): Promise<void> {
       emit('close');
     } else if (outcome.status === 'confirm') {
       errorMsg.value = '建表语句被判定为需要确认，请检查字段配置';
-    } else {
+    } else if (outcome.status === 'error') {
       errorMsg.value = outcome.message;
       toast.error(outcome.message);
     }

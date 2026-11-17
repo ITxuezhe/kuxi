@@ -27,7 +27,7 @@ import { buildSchemaText, dialectOf, explainSql, fixSql, optimizeSql } from '../
 import { formatSql } from '../utils/sql';
 import { useToast } from '../composables/useToast';
 
-export type TabKind = 'query' | 'data' | 'design' | 'pipeline';
+export type TabKind = 'query' | 'data' | 'design' | 'pipeline' | 'dashboard';
 
 export interface WorkbenchTab {
   id: string;
@@ -334,6 +334,21 @@ export function useWorkbench() {
       title: nextPipelineTitle(),
       pipeline: doc ? (JSON.parse(JSON.stringify(doc)) as PipelineDoc) : undefined,
     });
+    tabs.value.push(tab);
+    activeId.value = tab.id;
+    return tabs.value.find((t) => t.id === tab.id) ?? tab;
+  }
+
+  /**
+   * 打开仪表盘标签（单例：卡片列表全局共享，标签只承载视图）。
+   */
+  function openDashboard(): WorkbenchTab {
+    const existing = tabs.value.find((t) => t.kind === 'dashboard');
+    if (existing) {
+      activeId.value = existing.id;
+      return existing;
+    }
+    const tab = makeTab({ kind: 'dashboard', title: '仪表盘' });
     tabs.value.push(tab);
     activeId.value = tab.id;
     return tabs.value.find((t) => t.id === tab.id) ?? tab;
@@ -679,6 +694,7 @@ export function useWorkbench() {
     openData,
     openDesign,
     openPipeline,
+    openDashboard,
     applyToActiveQuery,
     select,
     close,

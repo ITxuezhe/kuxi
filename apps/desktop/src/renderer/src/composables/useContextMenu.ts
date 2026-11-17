@@ -7,7 +7,7 @@
  * - 复用同一份视觉与交互（固定定位、点外部/Esc 关闭、危险项红色、分隔线）
  */
 
-import { readonly, ref, type Ref } from 'vue';
+import { readonly, ref, type DeepReadonly, type Ref } from 'vue';
 
 export interface MenuItem {
   label: string;
@@ -51,9 +51,9 @@ export function closeContextMenu(): void {
   }
 }
 
-/** 供组件读取菜单状态 */
+/** 供组件读取菜单状态（只读视图：外部只能通过 open/close 修改） */
 export function useContextMenu(): {
-  state: Readonly<Ref<MenuState>>;
+  state: Readonly<Ref<DeepReadonly<MenuState>>>;
   close: () => void;
 } {
   return { state: readonly(state), close: closeContextMenu };

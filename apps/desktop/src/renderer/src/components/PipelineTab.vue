@@ -7,12 +7,13 @@
  * 运行走 window.kuxi.pipelineRun（主进程 harness 执行），输出进 pipeResult。
  * IPC 前对行数据 toRaw（Vue 深代理不参与结构化克隆）。
  */
-import { computed, onMounted, onUnmounted, reactive, ref, toRaw } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, toRaw } from 'vue';
 import type { ChartPreset, PipelineDoc, PipelineNodeInfo, PipelineRunOutcome, QueryResult, StepTrace } from '@kuxi/shared';
 import { useWorkbench, type WorkbenchTab } from '../composables/useWorkbench';
 import { useToast } from '../composables/useToast';
 import ResultTable from './ResultTable.vue';
 import ResultChart from './ResultChart.vue';
+import PipelineCanvas from './PipelineCanvas.vue';
 import BaseIcon from './BaseIcon.vue';
 import ConfirmModal from './ConfirmModal.vue';
 import { askAi, buildPipelinePrompt, extractPipelineSteps } from '../composables/useAi';
@@ -67,11 +68,49 @@ onMounted(async () => {
   }
   void loadConnections();
   window.addEventListener('kuxi:plugins-reloaded', refreshNodes);
+  document.addEventListener('pointerdown', onDocPointerDown, true);
+  document.addEventListener('keydown', onDocKeydown);
 });
 
 onUnmounted(() => {
   window.removeEventListener('kuxi:plugins-reloaded', refreshNodes);
+  document.removeEventListener('pointerdown', onDocPointerDown, true);
+  document.removeEventListener('keydown', onDocKeydown);
 });
+
+// ---------------- 步骤头收纳（UI 简化 P1） ----------------
+
+/** AI 生成输入行：默认收起，点步骤头 sparkles 展开 */
+const aiOpen = ref(false);
+
+/** 「⋯」保存/加载菜单（外点 / Esc 关闭，同 TopbarMore 模式） */
+const moreOpen = ref(false);
+const moreRoot = ref<HTMLElement | null>(null);
+
+function onDocPointerDown(event: PointerEvent): void {
+  if (moreOpen.value && moreRoot.value && !moreRoot.value.contains(event.target as Node)) {
+    moreOpen.value = false;
+  }
+}
+
+function onDocKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && moreOpen.value) moreOpen.value = false;
+}
+
+/** 管线名：点击改名（blur / Enter 提交，空值回退原名） */
+const nameEditing = ref(false);
+const nameInputEl = ref<HTMLInputElement | null>(null);
+
+function startNameEdit(): void {
+  nameEditing.value = true;
+  void nextTick(() => nameInputEl.value?.focus());
+}
+
+function commitName(): void {
+  if (!nameEditing.value) return;
+  nameEditing.value = false;
+  if (!nameDraft.value.trim()) nameDraft.value = doc.value.name;
+}
 
 // ---------------- 源数据 ----------------
 
@@ -127,6 +166,28 @@ function moveStep(index: number, delta: number): void {
   if (to < 0 || to >= steps.length) return;
   const [s] = steps.splice(index, 1);
   steps.splice(to, 0, s);
+}
+
+// ---------------- 画布视图（A3） ----------------
+
+/** false=列表（Applied Steps），true=画布（线性链可视化+拖拽重排） */
+const canvasView = ref(false);
+
+/** 画布拖拽重排：通用版 moveStep（任意目标位） */
+function reorderStep(from: number, to: number): void {
+  const steps = doc.value.steps;
+  if (from < 0 || from >= steps.length || to < 0 || to >= steps.length || from === to) return;
+  const [s] = steps.splice(from, 1);
+  steps.splice(to, 0, s);
+}
+
+/** 画布点卡片：回列表视图并滚动定位到该步（编辑字段在列表里做，画布专注结构与顺序） */
+function focusStep(index: number): void {
+  canvasView.value = false;
+  void nextTick(() => {
+    const el = document.querySelectorAll<HTMLElement>('.ptab-steplist .ptab-step')[index];
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
 }
 
 function removeStep(index: number): void {
@@ -282,6 +343,44 @@ const chartPreset = computed<ChartPreset | undefined>(() => {
 function onChartChange(p: ChartPreset): void {
   const step = doc.value.steps[chartStepIndex.value];
   if (step) step.options = { ...step.options, ...p };
+}
+
+/** 预览切换：图表 / 表格（无图表节点时恒显示表格） */
+const previewMode = ref<'chart' | 'table'>('chart');
+
+// ---------------- 存入仪表盘 ----------------
+
+const dashBusy = ref(false);
+
+/** 把当前图表 + 结果快照存成仪表盘卡片（快照截 500 行，离线可看） */
+async function saveToDashboard(): Promise<void> {
+  if (!pipeResult.value || !chartPreset.value?.category) {
+    toast.info('先运行带「图表」节点的管线，再存入仪表盘');
+    return;
+  }
+  dashBusy.value = true;
+  try {
+    const SNAP_ROWS = 500;
+    await window.kuxi.dashboardUpsert({
+      id: '',
+      title: `${nameDraft.value.trim() || doc.value.name} · ${chartPreset.value.category}`,
+      preset: { ...chartPreset.value },
+      snapshot: {
+        columns: [...pipeResult.value.columns],
+        rows: pipeResult.value.rows.slice(0, SNAP_ROWS).map((r) => toRaw(r)),
+        rowCount: pipeResult.value.rows.length,
+      },
+      pipelineId: doc.value.id || undefined,
+      pipelineName: doc.value.name,
+      createdAt: 0,
+      updatedAt: 0,
+    });
+    toast.success('已存入仪表盘（新标签「仪」可查看）');
+  } catch (e) {
+    toast.error(`存入仪表盘失败：${(e as Error).message}`);
+  } finally {
+    dashBusy.value = false;
+  }
 }
 
 // ---------------- 保存 / 加载 / 删除 ----------------
@@ -509,12 +608,67 @@ function onAiConfirmed(): void {
       <!-- 中：Applied Steps -->
       <section class="ptab-steps" aria-label="管线步骤">
         <div class="ptab-steps-head">
-          <h4>步骤（依序执行）</h4>
+          <input
+            v-if="nameEditing"
+            ref="nameInputEl"
+            v-model="nameDraft"
+            class="input ptab-name-input"
+            aria-label="管线名称"
+            @keyup.enter="commitName"
+            @blur="commitName"
+          />
+          <button v-else class="ptab-name" type="button" title="点击重命名管线" @click="startNameEdit">
+            <strong>{{ nameDraft.trim() || doc.name }}</strong>
+            <BaseIcon name="edit" :size="12" />
+          </button>
+          <span class="ptab-step-space"></span>
+          <div class="ptab-viewseg" role="group" aria-label="步骤视图切换">
+            <button type="button" :class="{ active: !canvasView }" @click="canvasView = false">列表</button>
+            <button type="button" :class="{ active: canvasView }" @click="canvasView = true">画布</button>
+          </div>
+          <button
+            class="btn-icon"
+            :class="{ 'is-on': aiOpen }"
+            type="button"
+            title="AI 生成步骤"
+            aria-label="AI 生成步骤"
+            @click="aiOpen = !aiOpen"
+          >
+            <BaseIcon name="sparkles" :size="14" />
+          </button>
+          <div ref="moreRoot" class="ptab-more">
+            <button
+              class="btn-icon"
+              :class="{ 'is-on': moreOpen }"
+              type="button"
+              title="保存 / 加载 / 删除管线"
+              aria-label="保存或加载管线"
+              @click="moreOpen = !moreOpen"
+            >
+              ⋯
+            </button>
+            <div v-if="moreOpen" class="ptab-more-panel" role="menu" aria-label="管线保存与加载">
+              <div class="ptab-more-row">
+                <button class="btn btn-primary" :disabled="pipeBusy" @click="savePipeline">保存</button>
+                <button class="btn" :disabled="!doc.id" @click="saveAsNew">另存为</button>
+              </div>
+              <div class="ptab-more-row">
+                <select v-model="loadPick" class="input" aria-label="已保存管线">
+                  <option value="">已保存管线（{{ savedList.length }}）</option>
+                  <option v-for="p in savedList" :key="p.id" :value="p.id">{{ p.name }}（{{ p.steps.length }} 步）</option>
+                </select>
+              </div>
+              <div class="ptab-more-row">
+                <button class="btn" :disabled="!loadPick" @click="loadPipeline">加载</button>
+                <button class="btn danger-text" :disabled="!loadPick" @click="deletePipeline">删除</button>
+              </div>
+            </div>
+          </div>
           <button class="btn btn-primary" :disabled="pipeBusy || !doc.steps.length" @click="runPipeline">
             {{ pipeBusy ? '运行中…' : '▶ 运行管线' }}
           </button>
         </div>
-        <div class="ptab-ai">
+        <div v-if="aiOpen" class="ptab-ai">
           <input
             v-model="aiReq"
             class="input"
@@ -528,7 +682,18 @@ function onAiConfirmed(): void {
           </button>
         </div>
         <p v-if="!doc.steps.length" class="ptab-tip">从左侧节点面板添加步骤，串成「去重 → 补空 → 聚合 → 出图」</p>
-        <ol class="ptab-steplist">
+        <PipelineCanvas
+          v-if="canvasView"
+          :steps="doc.steps"
+          :nodes="nodes"
+          :source-rows="sourceRows"
+          :source-columns="tab.result?.columns.length ?? 0"
+          :traces="trace"
+          @reorder="reorderStep"
+          @remove="removeStep"
+          @focus="focusStep"
+        />
+        <ol v-else class="ptab-steplist">
           <li v-for="(step, i) in doc.steps" :key="step.id" class="ptab-step">
             <div class="ptab-step-head">
               <span class="ptab-step-no">{{ i + 1 }}</span>
@@ -587,29 +752,27 @@ function onAiConfirmed(): void {
       </section>
     </div>
 
-    <!-- 保存/加载条 -->
-    <div class="ptab-savebar">
-      <input v-model="nameDraft" class="input" placeholder="管线名称" aria-label="管线名称" />
-      <button class="btn btn-primary" @click="savePipeline">保存</button>
-      <button class="btn" :disabled="!doc.id" @click="saveAsNew">另存为</button>
-      <select v-model="loadPick" class="input" aria-label="已保存管线">
-        <option value="">已保存管线（{{ savedList.length }}）</option>
-        <option v-for="p in savedList" :key="p.id" :value="p.id">{{ p.name }}（{{ p.steps.length }} 步）</option>
-      </select>
-      <button class="btn" :disabled="!loadPick" @click="loadPipeline">加载</button>
-      <button class="btn" :disabled="!loadPick" @click="deletePipeline">删除</button>
-    </div>
-
     <!-- 预览区 -->
     <div class="ptab-preview">
+      <div v-if="pipeResult && chartPreset?.category" class="ptab-chartbar">
+        <div class="ptab-viewseg" role="group" aria-label="预览切换">
+          <button type="button" :class="{ active: previewMode === 'chart' }" @click="previewMode = 'chart'">图表</button>
+          <button type="button" :class="{ active: previewMode === 'table' }" @click="previewMode = 'table'">表格</button>
+        </div>
+        <span class="ptab-step-space"></span>
+        <button class="btn" :disabled="dashBusy" title="把当前图表与结果快照固定到仪表盘" @click="saveToDashboard">
+          <BaseIcon name="chart" :size="13" />
+          {{ dashBusy ? '存入中…' : '存入仪表盘' }}
+        </button>
+      </div>
       <ResultChart
-        v-if="pipeResult && chartPreset?.category"
+        v-if="pipeResult && previewMode === 'chart' && chartPreset?.category"
         :result="pipeResult"
         :preset="chartPreset"
         @change="onChartChange"
       />
-      <ResultTable v-if="pipeResult" :result="pipeResult" />
-      <p v-else class="ptab-tip pab-preview-empty">运行管线后在这里预览结果</p>
+      <ResultTable v-if="pipeResult && (previewMode === 'table' || !chartPreset?.category)" :result="pipeResult" />
+      <p v-if="!pipeResult" class="ptab-tip pab-preview-empty">运行管线后在这里预览结果</p>
     </div>
 
     <!-- 写回确认：含维护节点的运行必须先过这道闸 -->
@@ -738,6 +901,79 @@ function onAiConfirmed(): void {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+}
+/* 管线名：点击改名（收纳原保存条中的名称输入框） */
+.ptab-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: text;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.ptab-name:hover {
+  background: var(--panel);
+}
+.ptab-name-input {
+  max-width: 200px;
+  font-size: 13px;
+}
+/* 「⋯」保存/加载菜单 */
+.ptab-more {
+  position: relative;
+}
+.ptab-more-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 260px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 14%);
+}
+.ptab-more-row {
+  display: flex;
+  gap: 8px;
+}
+.ptab-more-row .input {
+  flex: 1;
+  min-width: 0;
+}
+.btn-icon.is-on {
+  background: var(--accent-soft, rgb(74 125 255 / 14%));
+  color: var(--accent, #4a7dff);
+}
+.ptab-viewseg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ptab-viewseg button {
+  border: none;
+  background: var(--panel);
+  color: var(--muted);
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ptab-viewseg button + button {
+  border-left: 1px solid var(--border);
+}
+.ptab-viewseg button.active {
+  background: var(--accent-soft, rgb(74 125 255 / 14%));
+  color: var(--accent, #4a7dff);
+  font-weight: 600;
 }
 .ptab-ai {
   display: flex;
@@ -889,5 +1125,12 @@ function onAiConfirmed(): void {
 .pab-preview-empty {
   padding: 24px;
   text-align: center;
+}
+.ptab-chartbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
 }
 </style>

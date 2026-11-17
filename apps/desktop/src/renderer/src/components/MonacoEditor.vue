@@ -37,7 +37,8 @@ const editorHeight = ref<number>(loadEditorHeight());
  * - 底部分隔条可拖拽调高度（持久化，所有标签同步）
  * - 底部工具栏提供可见的 AI 入口（解释 / 优化 / 修复），与右键菜单功能一致
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+// ref 已在上方普通 <script> 块导入（模块级共享 editorHeight），此处不重复导入
+import { onBeforeUnmount, onMounted, watch } from 'vue';
 import { monaco, applyMonacoTheme } from '../monaco-setup';
 import { openContextMenu } from '../composables/useContextMenu';
 import { useTheme, type FontSizeName } from '../composables/useTheme';

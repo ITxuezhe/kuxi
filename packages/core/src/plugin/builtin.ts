@@ -490,6 +490,81 @@ export function mountBuiltinPlugins(h: Harness): Harness {
     }),
   });
 
+  // ---- 维护扫描节点（P5 补全：借鉴 NovexDB 的健康/索引建议，纯行内分析无需写库）----
+  h.mount({
+    manifest: {
+      id: 'inspector.health',
+      name: '健康扫描',
+      type: 'transformer',
+      version: '1.0.0',
+      description: '对当前数据集输出一行体检汇总：行数/列数/空单元格/完全重复行/全空列',
+    },
+    mount: (): TransformerCapability => ({
+      label: '健康扫描',
+      apply: (rows) => {
+        const colSet = new Set<string>();
+        for (const row of rows) for (const k of Object.keys(row)) colSet.add(k);
+        const columnList = [...colSet];
+        const emptyCols = new Set(columnList);
+        let nullCells = 0;
+        const rowSignatures = new Set<string>();
+        let dupRows = 0;
+        for (const row of rows) {
+          const sig = JSON.stringify(columnList.map((c) => row[c] ?? null));
+          if (rowSignatures.has(sig)) dupRows += 1;
+          else rowSignatures.add(sig);
+          for (const c of columnList) {
+            if (isEmptyValue(row[c])) {
+              nullCells += 1;
+            } else {
+              emptyCols.delete(c);
+            }
+          }
+        }
+        return [
+          {
+            rows: rows.length,
+            columns: columnList.length,
+            nullCells,
+            dupRows,
+            emptyColumns: emptyCols.size,
+          },
+        ];
+      },
+    }),
+  });
+
+  h.mount({
+    manifest: {
+      id: 'inspector.index',
+      name: '索引建议',
+      type: 'transformer',
+      version: '1.0.0',
+      description: '按列的区分度给出索引建议：唯一键候选 / 可考虑普通索引 / 收益有限',
+    },
+    mount: (): TransformerCapability => ({
+      label: '索引建议',
+      fields: [{ key: 'fields', label: '分析列（留空=全部列）', type: 'multiselect', optionsFrom: 'columns' }],
+      apply: (rows, options = {}) => {
+        if (rows.length < 2) return [{ column: '-', distinct: rows.length, ratio: null, suggestion: '样本行数过少（<2 行），无法评估区分度' }];
+        const colSet = new Set<string>();
+        for (const row of rows) for (const k of Object.keys(row)) colSet.add(k);
+        const wanted = listOption(options, 'fields');
+        const target = wanted.length ? wanted.filter((c) => colSet.has(c)) : [...colSet];
+        return target.map((column) => {
+          const distinct = new Set<string>();
+          for (const row of rows) distinct.add(JSON.stringify(row[column] ?? null));
+          const ratio = distinct.size / rows.length;
+          let suggestion: string;
+          if (ratio >= 0.99) suggestion = '唯一性极高，适合主键或唯一索引';
+          else if (ratio >= 0.5) suggestion = '区分度较高，可考虑普通索引';
+          else suggestion = '区分度低，索引收益有限';
+          return { column, distinct: distinct.size, ratio: Math.round(ratio * 100) / 100, suggestion };
+        });
+      },
+    }),
+  });
+
   // ---- 命令 ----
   h.mount({
     manifest: { id: 'command.health', name: '健康检查命令', type: 'command', version: '1.0.0' },
