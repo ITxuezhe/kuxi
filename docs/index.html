@@ -444,6 +444,7 @@
     <nav>
       <a href="#entries">能做什么</a>
       <a href="#compare">凭什么选它</a>
+      <a href="#deeper">进阶</a>
       <a href="#secure">安全</a>
       <a href="#download">下载</a>
       <a class="btn btn-sm btn-primary" href="https://github.com/ITxuezhe/kuxi/releases/latest" target="_blank" rel="noopener">下载安装包</a>
@@ -642,6 +643,44 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 进阶 ================= -->
+  <section id="deeper" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="kicker">Beyond queries</div>
+        <h2>问完之后，还能接着往下走</h2>
+        <p class="sub">
+          问一句拿一次结果只是起点。整理、清洗、维护、分析可以做成能回看的步骤，这套能力也能接到你自己的 AI 客户端里。
+        </p>
+      </div>
+      <div class="secure-grid">
+        <article class="card reveal">
+          <h3>数据管线：把整理过程存下来</h3>
+          <p>去重、过滤、列计算、聚合、写回，每一步都是一个节点。跑完能看到每步行数变化，随时回退到某一步重跑；也可以用一句话让 AI 生成整条管线草稿。</p>
+        </article>
+        <article class="card reveal">
+          <h3>画布视图：一眼看清数据流向</h3>
+          <p>管线可以切成「源 → 步骤 → 落库」的链式卡片，拖拽就能调整顺序，比长长的列表更容易看懂一条数据是怎么被加工出来的。</p>
+        </article>
+        <article class="card reveal">
+          <h3>分析仪表盘：结果留着随时看</h3>
+          <p>管线产出的图表可以一键存进仪表盘，卡片持久化保存、离线也能打开。盯趋势、做周报，不用每次重新跑一遍。</p>
+        </article>
+        <article class="card reveal">
+          <h3>接进你自己的 AI 客户端</h3>
+          <p>库犀的 8 个能力（连库、看表、只读查询、跑管线等）以 MCP 形式开放，Claude、Cursor 等客户端配上就能直接查你的库，查询一律只读、改写会被拒绝。</p>
+        </article>
+      </div>
+      <div class="cmd">
+        <span id="mcp-cmd">npx -y kuxi-mcp</span>
+        <button type="button" id="mcp-copy">复制</button>
+      </div>
+      <div class="dl-note">
+        <span>本机有 Node 18+ 即可，一条命令装上，不用克隆仓库。</span>
       </div>
     </div>
   </section>
@@ -859,6 +898,19 @@
   document.getElementById('copy-btn')?.addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
     const text = document.getElementById('cmd-text').textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = '已复制';
+    } catch (_) {
+      btn.textContent = '请手动选择复制';
+    }
+    setTimeout(() => { btn.textContent = '复制'; }, 2000);
+  });
+
+  // 3b) 复制 MCP 接入命令
+  document.getElementById('mcp-copy')?.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    const text = document.getElementById('mcp-cmd').textContent;
     try {
       await navigator.clipboard.writeText(text);
       btn.textContent = '已复制';
