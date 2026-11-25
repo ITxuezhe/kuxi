@@ -56,3 +56,6 @@ Phase0-任务清单.md
 
 # npm pack 产物
 *.tgz
+
+# VS Code 扩展打包产物
+*.vsix

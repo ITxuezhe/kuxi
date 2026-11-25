@@ -149,6 +149,8 @@ export interface IConnectionConfig {
   password?: string;
   database?: string;
   ssl?: boolean;
+  /** 连接分组（仅用于列表归类，不参与建连） */
+  group?: string;
   /** SSH 隧道（仅 mysql / postgres 生效） */
   ssh?: SshConfig;
 }

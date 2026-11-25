@@ -396,6 +396,14 @@ textarea:disabled {
      否则首张卡片/空状态虚线框会直接贴住吸顶头底部分隔线 */
   padding: var(--pad-panel) var(--pad-panel) 0;
 }
+/* 连接分组标题：仅在存在命名分组时渲染 */
+.conn-group {
+  padding: 4px 2px 0;
+  color: var(--muted);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .conn-item {
   display: flex;
   align-items: flex-start;

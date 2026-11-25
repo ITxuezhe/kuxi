@@ -43,6 +43,8 @@ declare global {
     user?: string;
     database?: string;
     ssl?: boolean;
+    /** 连接分组（仅展示用） */
+    group?: string;
     /** SSH 隧道的非敏感字段 */
     ssh?: {
       enabled: boolean;

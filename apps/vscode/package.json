@@ -1,34 +1,97 @@
 {
   "name": "kuxi-vscode",
-  "displayName": "库犀 Kuxi（原型）",
-  "description": "VSCode 外壳原型：复用 kuxi-core headless 引擎，连 SQLite 跑只读查询与管线（P5 平台化验证）",
-  "version": "0.0.0",
-  "private": true,
+  "displayName": "库犀 Kuxi",
+  "description": "在 VS Code 里连接 SQLite / MySQL / PostgreSQL：侧边栏浏览库表、点表看数据、右键执行选中 SQL，数据全部留在本机。",
+  "version": "0.4.0",
   "publisher": "kuxi",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.103.0"
   },
   "categories": ["Other"],
+  "keywords": ["sqlite", "mysql", "postgresql", "sql", "database", "kuxi", "库犀", "只读查询"],
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ITxuezhe/kuxi.git",
+    "directory": "apps/vscode"
+  },
+  "homepage": "https://itxuezhe.github.io/kuxi/",
+  "bugs": {
+    "url": "https://github.com/ITxuezhe/kuxi/issues"
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "kuxi.connectSqlite", "title": "库犀: 连接 SQLite" },
+      { "command": "kuxi.newConnection", "title": "库犀: 新建连接", "icon": "$(add)" },
+      { "command": "kuxi.connectSqlite", "title": "库犀: 快速连接 SQLite", "icon": "$(add)" },
+      { "command": "kuxi.openDatabaseFile", "title": "库犀: 打开数据库文件", "icon": "$(folder-opened)" },
       { "command": "kuxi.listTables", "title": "库犀: 列出表" },
-      { "command": "kuxi.runReadonlyQuery", "title": "库犀: 执行只读查询" },
+      { "command": "kuxi.openTable", "title": "库犀: 查看表数据", "icon": "$(go-to-file)" },
+      { "command": "kuxi.runReadonlyQuery", "title": "库犀: 执行只读查询", "icon": "$(play)" },
+      { "command": "kuxi.runSelection", "title": "库犀: 执行选中 SQL", "icon": "$(play)" },
       { "command": "kuxi.runPipeline", "title": "库犀: 查询结果跑管线（按列去重）" },
-      { "command": "kuxi.disconnect", "title": "库犀: 断开连接" }
-    ]
+      { "command": "kuxi.connectSaved", "title": "库犀: 连接已保存连接", "icon": "$(plug)" },
+      { "command": "kuxi.deleteSaved", "title": "库犀: 删除已保存连接", "icon": "$(trash)" },
+      { "command": "kuxi.useConnection", "title": "库犀: 设为当前连接", "icon": "$(check)" },
+      { "command": "kuxi.refresh", "title": "库犀: 刷新", "icon": "$(refresh)" },
+      { "command": "kuxi.disconnect", "title": "库犀: 断开连接", "icon": "$(debug-disconnect)" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "kuxi", "title": "库犀", "icon": "media/activity.svg" }
+      ]
+    },
+    "views": {
+      "kuxi": [
+        { "id": "kuxi.explorer", "name": "连接", "icon": "media/activity.svg", "contextualTitle": "库犀" }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "kuxi.explorer",
+        "contents": "还没有连接。\n[新建连接](command:kuxi.newConnection)\n[打开数据库文件](command:kuxi.openDatabaseFile)\n支持 SQLite / MySQL / PostgreSQL，连接信息只留在本机。"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "kuxi.newConnection", "when": "view == kuxi.explorer", "group": "navigation@1" },
+        { "command": "kuxi.openDatabaseFile", "when": "view == kuxi.explorer", "group": "navigation@2" },
+        { "command": "kuxi.refresh", "when": "view == kuxi.explorer", "group": "navigation@3" }
+      ],
+      "view/item/context": [
+        { "command": "kuxi.useConnection", "when": "view == kuxi.explorer && viewItem == kuxi.connection", "group": "inline@1" },
+        { "command": "kuxi.disconnect", "when": "view == kuxi.explorer && viewItem == kuxi.connection", "group": "inline@2" },
+        { "command": "kuxi.disconnect", "when": "view == kuxi.explorer && viewItem == kuxi.saved", "group": "inline@1" },
+        { "command": "kuxi.connectSaved", "when": "view == kuxi.explorer && viewItem == kuxi.saved", "group": "navigation@1" },
+        { "command": "kuxi.deleteSaved", "when": "view == kuxi.explorer && viewItem == kuxi.saved", "group": "1_modification@1" },
+        { "command": "kuxi.openTable", "when": "view == kuxi.explorer && viewItem == kuxi.table", "group": "navigation@1" }
+      ],
+      "explorer/context": [
+        {
+          "command": "kuxi.openDatabaseFile",
+          "when": "resourceScheme == file && (resourceExtname == .db || resourceExtname == .sqlite || resourceExtname == .sqlite3 || resourceExtname == .db3)",
+          "group": "navigation@90"
+        }
+      ],
+      "editor/context": [
+        { "command": "kuxi.runSelection", "when": "editorHasSelection", "group": "navigation@90" }
+      ],
+      "editor/title/context": [
+        { "command": "kuxi.runSelection", "when": "editorHasSelection", "group": "1_modification@90" }
+      ]
+    }
   },
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --external:cpu-features --outfile=dist/extension.js",
-    "test": "tsx src/test/logic.ts"
+    "test": "tsx src/test/logic.ts",
+    "vsix": "npm run build && npx --yes @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
     "kuxi-core": "workspace:*",
     "kuxi-shared": "workspace:*",
     "@types/node": "^22.10.2",
-    "@types/vscode": "^1.96.0",
+    "@types/vscode": "^1.103.0",
     "esbuild": "^0.24.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"

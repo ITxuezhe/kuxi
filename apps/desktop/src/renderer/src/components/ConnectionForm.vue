@@ -48,6 +48,7 @@ const form = reactive({
   user: 'root',
   password: '',
   database: '',
+  group: '',
   // ---- SSH 隧道（跳板机 / 内网库） ----
   sshEnabled: false,
   sshHost: '',
@@ -159,6 +160,7 @@ function hydrateFromInitial(): void {
   form.user = init.user ?? 'root';
   form.password = '';
   form.database = init.database ?? '';
+  form.group = init.group ?? '';
   form.sshEnabled = Boolean(init.ssh?.enabled);
   form.sshHost = init.ssh?.host ?? '';
   form.sshPort = init.ssh?.port ?? 22;
@@ -199,7 +201,7 @@ function useMemoryDb(): void {
 function buildConfig(): IConnectionConfig {
   const name = form.name.trim();
   if (form.type === 'sqlite') {
-    return { name, type: 'sqlite', filename: form.filename.trim() };
+    return { name, type: 'sqlite', filename: form.filename.trim(), group: form.group.trim() || undefined };
   }
   const config: IConnectionConfig = {
     name,
@@ -209,6 +211,7 @@ function buildConfig(): IConnectionConfig {
     user: form.user.trim(),
     password: form.password,
     database: form.database.trim(),
+    group: form.group.trim() || undefined,
   };
   if (form.sshEnabled) {
     config.ssh = {
@@ -417,6 +420,19 @@ async function onAiFill(): Promise<void> {
           @blur="touch('name')"
         />
         <p v-if="showError('name')" id="conn-name-error" class="field-error">{{ errors.name }}</p>
+      </div>
+    </div>
+
+    <div class="field-row span-3">
+      <label for="conn-group">分组</label>
+      <div>
+        <input
+          id="conn-group"
+          v-model="form.group"
+          type="text"
+          placeholder="可留空，例如：生产 / 测试 / 本地"
+        />
+        <p class="field-hint">仅用于侧边栏归类，不参与建连</p>
       </div>
     </div>
 

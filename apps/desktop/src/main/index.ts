@@ -69,6 +69,8 @@ interface StoredConnection {
   user?: string;
   database?: string;
   ssl?: boolean;
+  /** 列表分组（仅展示用） */
+  group?: string;
   /** SSH 隧道的非敏感字段（口令单独加密存） */
   ssh?: {
     enabled: boolean;
@@ -137,6 +139,7 @@ function toConfig(s: StoredConnection): IConnectionConfig {
     password: decryptSecret(s.passwordEnc),
     database: s.database,
     ssl: s.ssl,
+    group: s.group,
     ssh: s.ssh
       ? {
           enabled: s.ssh.enabled,
@@ -235,6 +238,7 @@ function registerIpc(): void {
       user: config.user,
       database: config.database,
       ssl: config.ssl,
+      group: config.group,
       ssh: sshToStore(config.ssh),
       passwordEnc: encryptSecret(config.password),
       sshPasswordEnc: encryptSecret(config.ssh?.password),
@@ -280,6 +284,7 @@ function registerIpc(): void {
         user: config.user,
         database: config.database,
         ssl: config.ssl,
+        group: config.group,
         ssh: sshToStore(config.ssh),
         passwordEnc: config.password ? encryptSecret(config.password) : existing.passwordEnc,
         // SSH 口令留空同样保留原值（编辑时表单不回显口令）

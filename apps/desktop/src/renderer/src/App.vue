@@ -243,6 +243,34 @@ const filteredConnections = computed<ConnectionItem[]>(() => {
 });
 
 /**
+ * 侧边栏分组视图：有分组名的按组归类，未分组的放在最前面。
+ * 只有存在命名分组时才显示「未分组」标题，避免平铺场景多出一行。
+ */
+const groupedConnections = computed<{ group: string; items: ConnectionItem[] }[]>(() => {
+  const named = new Map<string, ConnectionItem[]>();
+  const ungrouped: ConnectionItem[] = [];
+  for (const item of filteredConnections.value) {
+    const key = item.group?.trim();
+    if (!key) {
+      ungrouped.push(item);
+      continue;
+    }
+    const bucket = named.get(key);
+    if (bucket) bucket.push(item);
+    else named.set(key, [item]);
+  }
+
+  const groups: { group: string; items: ConnectionItem[] }[] = [];
+  if (ungrouped.length) {
+    groups.push({ group: named.size ? '未分组' : '', items: ungrouped });
+  }
+  for (const [group, items] of [...named.entries()].sort((a, b) => a[0].localeCompare(b[0], 'zh'))) {
+    groups.push({ group, items });
+  }
+  return groups;
+});
+
+/**
  * 拉取连接列表；若当前没有选中项则默认选中第一个。
  */
 async function refresh(): Promise<void> {
@@ -855,32 +883,35 @@ onMounted(async () => {
         </div><!-- /sidebar-sticky -->
 
         <div class="conn-list">
-          <div
-            v-for="item in filteredConnections"
-            :key="item.id"
-            class="conn-item"
-            :class="{ active: item.id === activeId }"
-            role="button"
-            tabindex="0"
-            :aria-pressed="item.id === activeId"
-            :aria-label="`${item.active ? '选择' : '连接'} ${item.name}`"
-            @click="onConnClick(item)"
-            @keydown="onCardKeydown($event, item)"
-            @contextmenu="onConnContextMenu($event, item)"
-          >
-            <span class="type-badge" :style="{ background: typeBadge(item.type).color }" aria-hidden="true">
-              <BaseIcon name="database" :size="14" />
-            </span>
-            <div class="conn-body">
-              <div class="conn-name">{{ item.name }}</div>
-              <div class="conn-sub">
-                {{ item.type }}
-                <template v-if="item.type === 'sqlite'"> · {{ item.filename || ':memory:' }}</template>
-                <template v-else> · {{ item.host }}:{{ item.port }}</template>
+          <template v-for="bucket in groupedConnections" :key="bucket.group || '__ungrouped__'">
+            <div v-if="bucket.group" class="conn-group">{{ bucket.group }}</div>
+            <div
+              v-for="item in bucket.items"
+              :key="item.id"
+              class="conn-item"
+              :class="{ active: item.id === activeId }"
+              role="button"
+              tabindex="0"
+              :aria-pressed="item.id === activeId"
+              :aria-label="`${item.active ? '选择' : '连接'} ${item.name}`"
+              @click="onConnClick(item)"
+              @keydown="onCardKeydown($event, item)"
+              @contextmenu="onConnContextMenu($event, item)"
+            >
+              <span class="type-badge" :style="{ background: typeBadge(item.type).color }" aria-hidden="true">
+                <BaseIcon name="database" :size="14" />
+              </span>
+              <div class="conn-body">
+                <div class="conn-name">{{ item.name }}</div>
+                <div class="conn-sub">
+                  {{ item.type }}
+                  <template v-if="item.type === 'sqlite'"> · {{ item.filename || ':memory:' }}</template>
+                  <template v-else> · {{ item.host }}:{{ item.port }}</template>
+                </div>
               </div>
+              <span class="conn-dot" :class="{ on: item.active }" :title="item.active ? '已连接' : '未连接'" aria-hidden="true"></span>
             </div>
-            <span class="conn-dot" :class="{ on: item.active }" :title="item.active ? '已连接' : '未连接'" aria-hidden="true"></span>
-          </div>
+          </template>
 
           <div v-if="!connections.length" class="empty-card">
             <strong>还没有任何连接</strong>
