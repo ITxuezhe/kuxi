@@ -12,6 +12,7 @@
 
 - macOS：`Kuxi-<version>-arm64.dmg`（Apple Silicon）/ `Kuxi-<version>-x64.dmg`（Intel）
 - Windows：`Kuxi-<version>-x64.exe`
+- VS Code 扩展：在 `apps/vscode` 执行 `pnpm vsix` 生成 `kuxi-vscode-<version>.vsix`，用「从 VSIX 安装」侧载（要求 VS Code 1.103+）
 
 > 当前安装包未做代码签名。macOS 首次打开若被拦截，请在 Finder 中右键 → 打开；Windows 若被 SmartScreen 拦截，点「更多信息」→「仍要运行」。
 
@@ -50,14 +51,14 @@
 **平台化（一个 core，多种外壳）**
 
 - MCP server：把库犀的 8 个能力（连库 / 列表 / 只读查询 / 跑管线等）暴露给 Claude Code、Cursor 等 AI 客户端，npm 一行接入：`npx kuxi-mcp`
-- npm 包：[kuxi-mcp](https://www.npmjs.com/package/kuxi-mcp) —— 单个包，core 引擎已打进 bundle，`npx kuxi-mcp` 即用（Node >= 22.5）
+- npm 包：[kuxi-mcp](https://www.npmjs.com/package/kuxi-mcp) —— 单个包，core 引擎已打进 bundle，`npx kuxi-mcp` 即用（Node >= 22.13）
 - Skill 打包：`skills/kuxi-db/`（AI 客户端可用的指令 + MCP 配置模板）
 - JSON-RPC daemon：行分隔 JSON-RPC over stdio，供 IDEA 等宿主集成
-- VSCode 扩展原型：`apps/vscode`
+- VS Code 扩展（0.4.0）：侧边栏按「分组 → 连接 → 表 → 列」浏览，点表看数据、选中 SQL 右键执行；支持 SSH 隧道，连接可存全局/工作区，密码进系统钥匙串
 
 **MCP server 接入（已用 SDK Client over stdio 端到端实测）**
 
-方式一（npm 包，推荐；要求 Node >= 22.5）：
+方式一（npm 包，推荐；要求 Node >= 22.13）：
 
 ```json
 {
@@ -101,7 +102,7 @@ packages/core        无头数据库引擎：驱动、连接管理、SQL 分类�
 packages/shared      跨包共享的类型与常量（零运行时依赖）
 packages/mcp         MCP server（stdio），AI 客户端接入
 packages/daemon      JSON-RPC daemon（stdio），IDE 集成
-apps/vscode          VSCode 扩展原型
+apps/vscode          VS Code 扩展（0.4.0，SSH 隧道 / 连接持久化 / 分组）
 ```
 
 - **数据库驱动跑在 Main 进程**，渲染进程只通过 IPC 调用，密码不进入渲染进程。

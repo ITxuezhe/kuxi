@@ -2,7 +2,7 @@
   "name": "kuxi-core",
   "version": "0.2.3",
   "type": "module",
-  "description": "库犀 KuXi 无头数据库引擎：驱动、连接管理、SQL 分类、数据管线、插件（Node >= 22.5，可脱离桌面端复用）",
+  "description": "库犀 KuXi 无头数据库引擎：驱动、连接管理、SQL 分类、数据管线、插件（Node >= 22.13，可脱离桌面端复用）",
   "keywords": [
     "database",
     "sql",
@@ -14,7 +14,7 @@
     "库犀"
   ],
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.13.0"
   },
   "repository": {
     "type": "git",

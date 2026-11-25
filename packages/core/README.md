@@ -1,6 +1,6 @@
 # kuxi-core — 库犀无头数据库引擎
 
-[库犀（KuXi）](https://github.com/ITxuezhe/kuxi)的 core 引擎：驱动、连接管理、SQL 分类、数据管线、插件系统，**不依赖 electron / vue**，可在任意 Node >= 22.5 运行时复用。
+[库犀（KuXi）](https://github.com/ITxuezhe/kuxi)的 core 引擎：驱动、连接管理、SQL 分类、数据管线、插件系统，**不依赖 electron / vue**，可在任意 Node >= 22.13 运行时复用。
 
 ```js
 import { createKuxiHost, callHostTool } from 'kuxi-core';

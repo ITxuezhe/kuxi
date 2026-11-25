@@ -1,5 +1,5 @@
 {
-  "$comment": "库犀 MCP server 接入模板：复制到 Claude Code（claude_desktop_config.json / .mcp.json）或 Cursor（~/.cursor/mcp.json）。方式一 npx 需 Node >= 22.5；方式二从源码跑，把 <repo> 替换为本仓库的绝对路径",
+  "$comment": "库犀 MCP server 接入模板：复制到 Claude Code（claude_desktop_config.json / .mcp.json）或 Cursor（~/.cursor/mcp.json）。方式一 npx 需 Node >= 22.13；方式二从源码跑，把 <repo> 替换为本仓库的绝对路径",
   "mcpServers": {
     "kuxi": {
       "command": "npx",
