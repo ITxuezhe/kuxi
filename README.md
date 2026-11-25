@@ -12,7 +12,7 @@
 
 - macOS：`Kuxi-<version>-arm64.dmg`（Apple Silicon）/ `Kuxi-<version>-x64.dmg`（Intel）
 - Windows：`Kuxi-<version>-x64.exe`
-- VS Code 扩展：在 `apps/vscode` 执行 `pnpm vsix` 生成 `kuxi-vscode-<version>.vsix`，用「从 VSIX 安装」侧载（要求 VS Code 1.103+）
+- VS Code 扩展：从 [vscode-v0.4.0](https://github.com/ITxuezhe/kuxi/releases/tag/vscode-v0.4.0) 下载 `kuxi-vscode-0.4.0.vsix`，扩展面板「…」→「从 VSIX 安装」（要求 VS Code 1.103+）；也可在 `apps/vscode` 执行 `pnpm vsix` 自行打包
 
 > 当前安装包未做代码签名。macOS 首次打开若被拦截，请在 Finder 中右键 → 打开；Windows 若被 SmartScreen 拦截，点「更多信息」→「仍要运行」。
 

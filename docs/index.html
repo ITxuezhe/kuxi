@@ -325,7 +325,7 @@
   .dl-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; }
   .dl-top h3 { font-size: 26px; }
   .dl-top .ver { font-family: var(--mono); font-size: 12px; color: var(--muted-2); }
-  .plats { margin-top: 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .plats { margin-top: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
   .plat {
     display: flex; align-items: center; gap: 16px; padding: 18px 20px;
     border-radius: 12px; border: 1px solid var(--line); background: rgba(18, 21, 28, .8);
@@ -681,7 +681,7 @@
       </div>
       <div class="dl-note">
         <span>本机有 Node 22.13+ 即可（内置 SQLite 驱动），一条命令装上，不用克隆仓库。</span>
-        <span>VS Code 扩展 0.4.0：编辑器内浏览库表、执行选中 SQL，支持 SSH 隧道与连接分组（VSIX 侧载）。</span>
+        <span>VS Code 扩展 0.4.0：编辑器内浏览库表、执行选中 SQL，支持 SSH 隧道与连接分组（VSIX 可直接下载）。</span>
       </div>
     </div>
   </section>
@@ -760,12 +760,21 @@
             </span>
             <span class="get">下载</span>
           </a>
+          <a class="plat" href="https://github.com/ITxuezhe/kuxi/releases/download/vscode-v0.4.0/kuxi-vscode-0.4.0.vsix">
+            <span class="glyph" aria-hidden="true">⌘</span>
+            <span class="t">
+              <b>VS Code 扩展 · 0.4.0</b>
+              <span>VS Code 1.103+ · vsix · 631 KB</span>
+            </span>
+            <span class="get">下载</span>
+          </a>
         </div>
 
         <div class="dl-note">
           <span>macOS 11+ / Windows 10、11</span>
           <span>Windows 内置自动更新 · macOS 请重新下载覆盖</span>
           <span>macOS 已做 ad-hoc 签名，不再提示「已损坏」</span>
+          <span>VSIX：VS Code 扩展面板「…」→「从 VSIX 安装」</span>
         </div>
 
         <div class="cmd" style="margin-top:26px">
@@ -929,7 +938,8 @@
     const TTL = 10 * 60 * 1000;
 
     const apply = (rel) => {
-      if (!rel || !rel.tag_name) return;
+      // 只认桌面端 semver 标签（v1.2.3）；扩展等其它 Release 不覆盖下载区版本
+      if (!rel || !/^v\d+\.\d+\.\d+$/.test(rel.tag_name || '')) return;
       const ver = String(rel.tag_name).replace(/^v/i, '');
       const assets = Array.isArray(rel.assets) ? rel.assets : [];
 
